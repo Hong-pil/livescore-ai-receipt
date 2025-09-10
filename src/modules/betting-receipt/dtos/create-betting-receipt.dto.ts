@@ -56,7 +56,7 @@ export class GameBetRtDto {
   @IsString()
   a_e_p?: string;
 
-  @ApiProperty({ example: 'Y', description: '히스토리 존재 영부' })
+  @ApiProperty({ example: 'Y', description: '히스토리 존재 여부' })
   @IsOptional()
   @IsString()
   history_yn?: string;
@@ -179,7 +179,7 @@ export class BettingItemDto {
     description: '베팅 타입',
     enum: ['home', 'away', 'draw', 'handicap', 'over', 'under']
   })
-  @IsEnum(['home', 'away', 'draw', 'handicap', 'over', 'under'])
+  @IsString()
   betting_type: string;
 
   @ApiProperty({ example: '독일', description: '베팅한 팀명' })
