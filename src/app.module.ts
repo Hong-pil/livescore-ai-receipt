@@ -9,6 +9,7 @@ import { AppService } from './app.service';
 import { TodosMongoModule } from './modules/todos-mongo/todos-mongo.module';
 import { TodosMySQLModule } from './modules/todos-mysql/todos-mysql.module';
 import { getTypeOrmConfig, getMongooseConfig } from './config/database.config';
+import { BettingReceiptModule } from './modules/betting-receipt/betting-receipt.module';
 
 @Module({
   imports: [
@@ -35,6 +36,7 @@ import { getTypeOrmConfig, getMongooseConfig } from './config/database.config';
     // 모듈들
     TodosMongoModule,
     TodosMySQLModule,
+    BettingReceiptModule,
   ],
   controllers: [AppController],
   providers: [AppService],
