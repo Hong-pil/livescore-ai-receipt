@@ -5,6 +5,19 @@ import { HydratedDocument } from 'mongoose';
 
 export type BettingReceiptDocument = HydratedDocument<BettingReceipt>;
 
+// 게임 상태 enum 정의
+export enum GameState {
+  BEFORE = 'before',
+  PLAYING = 'playing', 
+  FINISH = 'finish',
+  CANCELLED = 'cancelled',
+  // 추가로 실제 사용되는 값들
+  B = 'B', // 경기전
+  P = 'P', // 진행중
+  F = 'F', // 종료
+  C = 'C'  // 취소
+}
+
 // 베팅 배당률 정보
 @Schema({ _id: false })
 export class GameBetRt {
@@ -97,7 +110,10 @@ export class GameInfo {
   away_score: string;
 
   @ApiProperty({ example: 'before', description: '경기 상태' })
-  @Prop({ type: String })
+  @Prop({ 
+    type: String, 
+    enum: Object.values(GameState)
+  })
   state: string;
 
   @ApiProperty({ example: '경기전', description: '경기 상태 텍스트' })
@@ -148,11 +164,11 @@ export class BettingItem {
   @Prop({ required: true })
   odds: string;
 
-  @ApiProperty({ example: 10000, description: '베팅 금액' })
+  @ApiProperty({ example: 500, description: '베팅 금액' })
   @Prop({ required: true, type: Number })
   betting_amount: number;
 
-  @ApiProperty({ example: 10600, description: '예상 당첨 금액' })
+  @ApiProperty({ example: 1650, description: '예상 당첨 금액' })
   @Prop({ required: true, type: Number })
   expected_payout: number;
 }
@@ -179,15 +195,15 @@ export class BettingReceipt {
   @Prop({ type: [BettingItem], required: true })
   betting_items: BettingItem[];
 
-  @ApiProperty({ example: 50000, description: '총 베팅 금액' })
+  @ApiProperty({ example: 1000, description: '총 베팅 금액' })
   @Prop({ required: true, type: Number })
   total_betting_amount: number;
 
-  @ApiProperty({ example: 125000, description: '총 예상 당첨 금액' })
+  @ApiProperty({ example: 5400, description: '총 예상 당첨 금액' })
   @Prop({ required: true, type: Number })
   total_expected_payout: number;
 
-  @ApiProperty({ example: '2.5', description: '전체 배당률' })
+  @ApiProperty({ example: '5.4', description: '전체 배당률' })
   @Prop({ required: true })
   total_odds: string;
 

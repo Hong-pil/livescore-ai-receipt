@@ -14,6 +14,19 @@ import { Type } from 'class-transformer';
 import { generateResponse } from '@/common/utils/response.util';
 import { BettingReceipt } from '../schemas/betting-receipt.schema';
 
+// 게임 상태 enum 정의
+export enum GameState {
+  BEFORE = 'before',
+  PLAYING = 'playing', 
+  FINISH = 'finish',
+  CANCELLED = 'cancelled',
+  // 추가로 실제 사용되는 값들
+  B = 'B', // 경기전
+  P = 'P', // 진행중
+  F = 'F', // 종료
+  C = 'C'  // 취소
+}
+
 // 베팅 배당률 정보 DTO
 export class GameBetRtDto {
   @ApiProperty({ example: '1.06', description: '홈팀 배당률' })
@@ -124,11 +137,11 @@ export class GameInfoDto {
   @ApiProperty({ 
     example: 'before', 
     description: '경기 상태',
-    enum: ['before', 'playing', 'finish', 'cancelled'],
+    enum: Object.values(GameState),
     required: false 
   })
   @IsOptional()
-  @IsEnum(['before', 'playing', 'finish', 'cancelled'])
+  @IsEnum(GameState)
   state?: string;
 
   @ApiProperty({ example: '경기전', description: '경기 상태 텍스트', required: false })
@@ -190,12 +203,16 @@ export class BettingItemDto {
   @IsString()
   odds: string;
 
-  @ApiProperty({ example: 10000, description: '베팅 금액 (원)' })
+  @ApiProperty({ 
+    example: 500, 
+    description: '베팅 금액 (원) - 최소 500원',
+    minimum: 500 
+  })
   @IsNumber()
-  @Min(1000)
+  @Min(500, { message: '베팅 금액은 최소 500원 이상이어야 합니다.' })
   betting_amount: number;
 
-  @ApiProperty({ example: 10600, description: '예상 당첨 금액 (원)' })
+  @ApiProperty({ example: 1650, description: '예상 당첨 금액 (원)' })
   @IsNumber()
   @Min(0)
   expected_payout: number;
@@ -221,17 +238,21 @@ export class CreateBettingReceiptDto {
   @Type(() => BettingItemDto)
   betting_items: BettingItemDto[];
 
-  @ApiProperty({ example: 50000, description: '총 베팅 금액 (원)' })
+  @ApiProperty({ 
+    example: 1000, 
+    description: '총 베팅 금액 (원) - 최소 500원',
+    minimum: 500
+  })
   @IsNumber()
-  @Min(1000)
+  @Min(500, { message: '총 베팅 금액은 최소 500원 이상이어야 합니다.' })
   total_betting_amount: number;
 
-  @ApiProperty({ example: 125000, description: '총 예상 당첨 금액 (원)' })
+  @ApiProperty({ example: 5400, description: '총 예상 당첨 금액 (원)' })
   @IsNumber()
   @Min(0)
   total_expected_payout: number;
 
-  @ApiProperty({ example: '2.5', description: '전체 배당률' })
+  @ApiProperty({ example: '5.4', description: '전체 배당률' })
   @IsString()
   total_odds: string;
 

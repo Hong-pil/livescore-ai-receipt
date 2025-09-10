@@ -42,6 +42,20 @@ export class BettingReceiptService {
         throw new BadRequestException('총 베팅 금액이 베팅 항목들의 합계와 일치하지 않습니다.');
       }
 
+      // 최소 베팅 금액 검증 (각 항목별 500원 이상)
+      const invalidBettingItems = createBettingReceiptDto.betting_items.filter(
+        item => item.betting_amount < 500
+      );
+      
+      if (invalidBettingItems.length > 0) {
+        throw new BadRequestException('각 베팅 항목은 최소 500원 이상이어야 합니다.');
+      }
+
+      // 총 베팅 금액 최소값 검증 (500원 이상)
+      if (createBettingReceiptDto.total_betting_amount < 500) {
+        throw new BadRequestException('총 베팅 금액은 최소 500원 이상이어야 합니다.');
+      }
+
       // 영수증 ID 생성 (중복 확인)
       let receiptId: string = '';
       let isUnique = false;
@@ -286,5 +300,287 @@ export class BettingReceiptService {
       },
       { $sort: { _id: 1 } }
     ]);
+  }
+
+  // 배당률 검증 및 당첨 금액 계산
+  async validateOddsAndCalculatePayout(
+    bettingAmount: number, 
+    odds: string
+  ): Promise<number> {
+    const numericOdds = parseFloat(odds);
+    
+    if (isNaN(numericOdds) || numericOdds <= 0) {
+      throw new BadRequestException('유효하지 않은 배당률입니다.');
+    }
+    
+    return Math.round(bettingAmount * numericOdds);
+  }
+
+  // 베팅 영수증 상태별 조회
+  async findByStatus(status: string): Promise<BettingReceipt[]> {
+    return await this.bettingReceiptModel
+      .find({ status })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  // 베팅 영수증 일괄 상태 업데이트
+  async bulkUpdateStatus(
+    receiptIds: string[], 
+    status: string
+  ): Promise<{
+    updated: number;
+    failed: number;
+  }> {
+    let updated = 0;
+    let failed = 0;
+
+    for (const receiptId of receiptIds) {
+      try {
+        await this.update(receiptId, { status });
+        updated++;
+      } catch (error) {
+        failed++;
+      }
+    }
+
+    return { updated, failed };
+  }
+
+  // 베팅 영수증 일괄 삭제
+  async bulkDelete(receiptIds: string[]): Promise<{
+    deleted: number;
+    failed: number;
+  }> {
+    let deleted = 0;
+    let failed = 0;
+
+    for (const receiptId of receiptIds) {
+      try {
+        await this.remove(receiptId);
+        deleted++;
+      } catch (error) {
+        failed++;
+      }
+    }
+
+    return { deleted, failed };
+  }
+
+  // 게임별 베팅 통계 조회
+  async getGameBettingStats(gameId: string): Promise<{
+    totalBets: number;
+    totalBettingAmount: number;
+    homeBets: number;
+    awayBets: number;
+    drawBets: number;
+    homeAmount: number;
+    awayAmount: number;
+    drawAmount: number;
+  }> {
+    const stats = await this.bettingReceiptModel.aggregate([
+      { $unwind: '$betting_items' },
+      { $match: { 'betting_items.game_id': gameId } },
+      {
+        $group: {
+          _id: '$betting_items.betting_type',
+          count: { $sum: 1 },
+          amount: { $sum: '$betting_items.betting_amount' }
+        }
+      }
+    ]);
+
+    const result = {
+      totalBets: 0,
+      totalBettingAmount: 0,
+      homeBets: 0,
+      awayBets: 0,
+      drawBets: 0,
+      homeAmount: 0,
+      awayAmount: 0,
+      drawAmount: 0
+    };
+
+    for (const stat of stats) {
+      result.totalBets += stat.count;
+      result.totalBettingAmount += stat.amount;
+
+      switch (stat._id) {
+        case 'home':
+          result.homeBets = stat.count;
+          result.homeAmount = stat.amount;
+          break;
+        case 'away':
+          result.awayBets = stat.count;
+          result.awayAmount = stat.amount;
+          break;
+        case 'draw':
+          result.drawBets = stat.count;
+          result.drawAmount = stat.amount;
+          break;
+      }
+    }
+
+    return result;
+  }
+
+  // 베팅 영수증 취소
+  async cancelBettingReceipt(receiptId: string): Promise<BettingReceipt> {
+    const receipt = await this.findOne(receiptId);
+    
+    if (receipt.status !== 'pending') {
+      throw new BadRequestException('대기 중인 베팅만 취소할 수 있습니다.');
+    }
+
+    return await this.update(receiptId, { status: 'cancelled' });
+  }
+
+  // 베팅 영수증 당첨 처리
+  async processBettingWin(receiptId: string): Promise<BettingReceipt> {
+    const receipt = await this.findOne(receiptId);
+    
+    if (receipt.status !== 'pending') {
+      throw new BadRequestException('대기 중인 베팅만 당첨 처리할 수 있습니다.');
+    }
+
+    return await this.update(receiptId, { status: 'won' });
+  }
+
+  // 베팅 영수증 낙첨 처리
+  async processBettingLoss(receiptId: string): Promise<BettingReceipt> {
+    const receipt = await this.findOne(receiptId);
+    
+    if (receipt.status !== 'pending') {
+      throw new BadRequestException('대기 중인 베팅만 낙첨 처리할 수 있습니다.');
+    }
+
+    return await this.update(receiptId, { status: 'lost' });
+  }
+
+  // 사용자의 최근 베팅 영수증 조회
+  async getRecentBettingsByUser(
+    userNo: string, 
+    limit: number = 10
+  ): Promise<BettingReceipt[]> {
+    return await this.bettingReceiptModel
+      .find({ user_no: userNo })
+      .sort({ createdAt: -1 })
+      .limit(limit)
+      .exec();
+  }
+
+  // 날짜 범위별 베팅 영수증 조회
+  async findByDateRange(
+    startDate: string, 
+    endDate: string
+  ): Promise<BettingReceipt[]> {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    end.setHours(23, 59, 59, 999);
+
+    return await this.bettingReceiptModel
+      .find({
+        createdAt: { $gte: start, $lte: end }
+      })
+      .sort({ createdAt: -1 })
+      .exec();
+  }
+
+  // 베팅 타입별 통계
+  async getBettingTypeStats(): Promise<{
+    proto: { count: number; amount: number };
+    real: { count: number; amount: number };
+  }> {
+    const stats = await this.bettingReceiptModel.aggregate([
+      {
+        $group: {
+          _id: '$betting_type',
+          count: { $sum: 1 },
+          amount: { $sum: '$total_betting_amount' }
+        }
+      }
+    ]);
+
+    const result = {
+      proto: { count: 0, amount: 0 },
+      real: { count: 0, amount: 0 }
+    };
+
+    for (const stat of stats) {
+      if (stat._id === 'proto') {
+        result.proto = { count: stat.count, amount: stat.amount };
+      } else if (stat._id === 'real') {
+        result.real = { count: stat.count, amount: stat.amount };
+      }
+    }
+
+    return result;
+  }
+
+  // 전체 베팅 통계 요약
+  async getOverallStats(): Promise<{
+    totalBets: number;
+    totalAmount: number;
+    avgBetAmount: number;
+    totalUsers: number;
+    pendingBets: number;
+    completedBets: number;
+    winRate: number;
+  }> {
+    const [totalStats, userCount, statusStats] = await Promise.all([
+      this.bettingReceiptModel.aggregate([
+        {
+          $group: {
+            _id: null,
+            totalBets: { $sum: 1 },
+            totalAmount: { $sum: '$total_betting_amount' },
+            avgBetAmount: { $avg: '$total_betting_amount' }
+          }
+        }
+      ]),
+      this.bettingReceiptModel.distinct('user_no'),
+      this.bettingReceiptModel.aggregate([
+        {
+          $group: {
+            _id: '$status',
+            count: { $sum: 1 }
+          }
+        }
+      ])
+    ]);
+
+    const total = totalStats[0] || { totalBets: 0, totalAmount: 0, avgBetAmount: 0 };
+    const totalUsers = userCount.length;
+    
+    let pendingBets = 0;
+    let wonBets = 0;
+    let lostBets = 0;
+
+    for (const stat of statusStats) {
+      switch (stat._id) {
+        case 'pending':
+          pendingBets = stat.count;
+          break;
+        case 'won':
+          wonBets = stat.count;
+          break;
+        case 'lost':
+          lostBets = stat.count;
+          break;
+      }
+    }
+
+    const completedBets = wonBets + lostBets;
+    const winRate = completedBets > 0 ? (wonBets / completedBets) * 100 : 0;
+
+    return {
+      totalBets: total.totalBets,
+      totalAmount: total.totalAmount,
+      avgBetAmount: Math.round(total.avgBetAmount || 0),
+      totalUsers,
+      pendingBets,
+      completedBets,
+      winRate: Math.round(winRate * 100) / 100
+    };
   }
 }
