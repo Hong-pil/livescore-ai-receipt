@@ -1,7 +1,7 @@
 // src/modules/todos-mysql/repositories/todos-mysql.repository.ts
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, LessThan, Not } from 'typeorm';
+import { Repository, Like, LessThan, Not, IsNull } from 'typeorm';
 import { TodoMySQL, TodoStatus, TodoPriority } from '../entities/todo-mysql.entity';
 
 @Injectable()
@@ -24,7 +24,7 @@ export class TodosMySQLRepository {
       skip,
       take: limit,
       order: { createdAt: 'DESC' },
-      where: { deletedAt: null }
+      where: { deletedAt: IsNull() }
     });
 
     return { results, totalCount };
@@ -32,27 +32,27 @@ export class TodosMySQLRepository {
 
   async findById(id: number): Promise<TodoMySQL | null> {
     return this.todoRepository.findOne({
-      where: { id, deletedAt: null }
+      where: { id, deletedAt: IsNull() }
     });
   }
 
   async findByStatus(status: TodoStatus): Promise<TodoMySQL[]> {
     return this.todoRepository.find({
-      where: { status, deletedAt: null },
+      where: { status, deletedAt: IsNull() },
       order: { createdAt: 'DESC' }
     });
   }
 
   async findByPriority(priority: TodoPriority): Promise<TodoMySQL[]> {
     return this.todoRepository.find({
-      where: { priority, deletedAt: null },
+      where: { priority, deletedAt: IsNull() },
       order: { createdAt: 'DESC' }
     });
   }
 
   async findFavorites(): Promise<TodoMySQL[]> {
     return this.todoRepository.find({
-      where: { isFavorite: true, deletedAt: null },
+      where: { isFavorite: true, deletedAt: IsNull() },
       order: { createdAt: 'DESC' }
     });
   }
@@ -63,7 +63,7 @@ export class TodosMySQLRepository {
       where: {
         dueDate: LessThan(today),
         status: Not(TodoStatus.COMPLETED),
-        deletedAt: null
+        deletedAt: IsNull()
       },
       order: { dueDate: 'ASC' }
     });
@@ -73,7 +73,7 @@ export class TodosMySQLRepository {
     return this.todoRepository.find({
       where: {
         title: Like(`%${searchTerm}%`),
-        deletedAt: null
+        deletedAt: IsNull()
       },
       order: { createdAt: 'DESC' }
     });
@@ -97,7 +97,7 @@ export class TodosMySQLRepository {
   }
 
   async getStatistics(): Promise<any> {
-    const total = await this.todoRepository.count({ where: { deletedAt: null } });
+    const total = await this.todoRepository.count({ where: { deletedAt: IsNull() } });
     
     const statusStats = await this.todoRepository
       .createQueryBuilder('todo')
@@ -108,14 +108,14 @@ export class TodosMySQLRepository {
       .getRawMany();
 
     const favorites = await this.todoRepository.count({
-      where: { isFavorite: true, deletedAt: null }
+      where: { isFavorite: true, deletedAt: IsNull() }
     });
 
     const overdue = await this.todoRepository.count({
       where: {
         dueDate: LessThan(new Date()),
         status: Not(TodoStatus.COMPLETED),
-        deletedAt: null
+        deletedAt: IsNull()
       }
     });
 

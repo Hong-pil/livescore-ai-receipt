@@ -9,34 +9,34 @@ import { TodoMongo, TodoMongoDocument, TodoStatus, TodoPriority } from '../schem
 export class TodosMongoRepository extends CommonMongodbRepository<TodoMongoDocument> {
   constructor(
     @InjectModel(TodoMongo.name) 
-    private readonly todoModel: Model<TodoMongoDocument>
+    todoModel: Model<TodoMongoDocument>
   ) {
     super(todoModel);
   }
 
   async findByStatus(status: TodoStatus): Promise<TodoMongoDocument[]> {
-    return this.todoModel.find({ 
+    return this.model.find({ 
       status, 
       deletedAt: null 
     }).exec();
   }
 
   async findByPriority(priority: TodoPriority): Promise<TodoMongoDocument[]> {
-    return this.todoModel.find({ 
+    return this.model.find({ 
       priority, 
       deletedAt: null 
     }).exec();
   }
 
   async findFavorites(): Promise<TodoMongoDocument[]> {
-    return this.todoModel.find({ 
+    return this.model.find({ 
       isFavorite: true, 
       deletedAt: null 
     }).exec();
   }
 
   async findByTag(tag: string): Promise<TodoMongoDocument[]> {
-    return this.todoModel.find({ 
+    return this.model.find({ 
       tags: tag, 
       deletedAt: null 
     }).exec();
@@ -44,7 +44,7 @@ export class TodosMongoRepository extends CommonMongodbRepository<TodoMongoDocum
 
   async findOverdueTodos(): Promise<TodoMongoDocument[]> {
     const today = new Date();
-    return this.todoModel.find({
+    return this.model.find({
       dueDate: { $lt: today },
       status: { $ne: TodoStatus.COMPLETED },
       deletedAt: null
@@ -52,7 +52,7 @@ export class TodosMongoRepository extends CommonMongodbRepository<TodoMongoDocum
   }
 
   async searchByTitle(searchTerm: string): Promise<TodoMongoDocument[]> {
-    return this.todoModel.find({
+    return this.model.find({
       title: { $regex: searchTerm, $options: 'i' },
       deletedAt: null
     }).exec();
@@ -69,11 +69,11 @@ export class TodosMongoRepository extends CommonMongodbRepository<TodoMongoDocum
       }
     ];
 
-    const statusStats = await this.todoModel.aggregate(pipeline).exec();
+    const statusStats = await this.model.aggregate(pipeline).exec();
     
-    const total = await this.todoModel.countDocuments({ deletedAt: null });
-    const favorites = await this.todoModel.countDocuments({ isFavorite: true, deletedAt: null });
-    const overdue = await this.todoModel.countDocuments({
+    const total = await this.model.countDocuments({ deletedAt: null });
+    const favorites = await this.model.countDocuments({ isFavorite: true, deletedAt: null });
+    const overdue = await this.model.countDocuments({
       dueDate: { $lt: new Date() },
       status: { $ne: TodoStatus.COMPLETED },
       deletedAt: null

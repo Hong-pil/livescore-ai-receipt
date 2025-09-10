@@ -1,10 +1,6 @@
 // src/modules/todos-mongo/services/todos-mongo.service.ts
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { ObjectId } from 'mongodb';
-import { ClsService } from 'nestjs-cls';
-import { AppClsStore } from '@/common/types/cls.type';
-import { ClsStoreKey } from '@/common/constants/cls.constant';
-import { getDataLoader } from '@/common/utils/dataloader.util';
 import { TodosMongoRepository } from '../repositories/todos-mongo.mongodb.repository';
 import { CreateTodoMongoDto } from '../dtos/create-todo-mongo.dto';
 import { UpdateTodoMongoDto } from '../dtos/update-todo-mongo.dto';
@@ -16,7 +12,6 @@ export class TodosMongoService {
 
   constructor(
     private readonly todosMongoRepository: TodosMongoRepository,
-    private readonly clsService: ClsService<AppClsStore>,
   ) {}
 
   async create(createDto: CreateTodoMongoDto): Promise<TodoMongoDocument> {
@@ -25,8 +20,7 @@ export class TodosMongoService {
   }
 
   async getById(id: string): Promise<TodoMongoDocument> {
-    const dataLoaders = this.clsService.get(ClsStoreKey.DATA_LOADERS);
-    const todo = await getDataLoader(dataLoaders, this.todosMongoRepository).load(id);
+    const todo = await this.todosMongoRepository.findById(id);
     
     if (!todo) {
       throw new NotFoundException('할 일을 찾을 수 없습니다.');

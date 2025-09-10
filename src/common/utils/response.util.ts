@@ -8,7 +8,7 @@ export interface ApiResponseInterface<T> {
   message: string;
 }
 
-export function generateResponse<T>(dataType: Type<T> | Type<T[]>): Type<ApiResponseInterface<T>> {
+export function generateResponse<T>(dataType: Type<T>): any {
   class ResponseClass implements ApiResponseInterface<T> {
     @ApiProperty({ example: true, description: '성공 여부' })
     success: boolean;
@@ -36,5 +36,9 @@ export function generateResponse<T>(dataType: Type<T> | Type<T[]>): Type<ApiResp
     }
   }
 
-  return ResponseClass as Type<ApiResponseInterface<T>>;
+  // 정적 메서드들을 직접 할당
+  (ResponseClass as any).ok = ResponseClass.ok;
+  (ResponseClass as any).error = ResponseClass.error;
+
+  return ResponseClass;
 }

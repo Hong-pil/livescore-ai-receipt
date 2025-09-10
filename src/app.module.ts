@@ -3,7 +3,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { MongooseModule } from '@nestjs/mongoose';
-import { ClsModule } from 'nestjs-cls';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -17,18 +16,6 @@ import { getTypeOrmConfig, getMongooseConfig } from './config/database.config';
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
-    }),
-
-    // CLS (Context Local Storage) 설정
-    ClsModule.forRoot({
-      global: true,
-      middleware: {
-        mount: true,
-        setup: (cls, req) => {
-          cls.set('dataLoaders', new Map());
-          cls.set('requestId', req.headers['x-request-id'] || Math.random().toString(36));
-        },
-      },
     }),
 
     // TypeORM (MySQL) 설정

@@ -15,4 +15,4 @@ export class UpdateTodoMongoDto extends PartialType(
   ] as const)
 ) {}
 
-export class UpdateTodoMongoResponse extends generateResponse(UpdateTodoMongoDto) {}
+export class UpdateTodoMongoResponse extends generateResponse(TodoMongo) {}
