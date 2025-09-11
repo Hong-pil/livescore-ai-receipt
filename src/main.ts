@@ -1,3 +1,8 @@
+/**
+ * PM2 실행 방법
+ */
+
+
 // src/main.ts
 import { NestFactory } from '@nestjs/core';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
