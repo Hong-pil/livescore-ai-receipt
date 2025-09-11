@@ -16,15 +16,18 @@ import { BettingReceipt } from '../schemas/betting-receipt.schema';
 
 // 게임 상태 enum 정의
 export enum GameState {
+  // 한글 설명용 값들
   BEFORE = 'before',
   PLAYING = 'playing', 
   FINISH = 'finish',
   CANCELLED = 'cancelled',
-  // 추가로 실제 사용되는 값들
-  B = 'B', // 경기전
-  P = 'P', // 진행중
-  F = 'F', // 종료
-  C = 'C'  // 취소
+  
+  // 실제 사용되는 발매 상태 값들
+  I = 'I', // 발매중 (In Sale) ⭐ 중요!
+  B = 'B', // 발매전 (Before Sale)
+  F = 'F', // 발매 종료 (Finished Sale)
+  C = 'C', // 취소 (Cancelled)
+  P = 'P', // 진행중 (Playing)
 }
 
 // 베팅 배당률 정보 DTO
@@ -135,12 +138,13 @@ export class GameInfoDto {
   away_score?: string;
 
   @ApiProperty({ 
-    example: 'before', 
-    description: '경기 상태 (예: before, playing, finish, cancelled, B, P, F, C, I, S, H, E 등)',
+    example: 'I', 
+    description: '발매 상태 (I: 발매중, B: 발매전, F: 발매 종료, C: 취소)',
+    enum: Object.values(GameState),
     required: false 
   })
   @IsOptional()
-  @IsString()
+  @IsEnum(GameState)
   state?: string;
 
   @ApiProperty({ example: '경기전', description: '경기 상태 텍스트', required: false })
