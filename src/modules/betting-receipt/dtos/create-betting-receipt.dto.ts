@@ -136,12 +136,11 @@ export class GameInfoDto {
 
   @ApiProperty({ 
     example: 'before', 
-    description: '경기 상태',
-    enum: Object.values(GameState),
+    description: '경기 상태 (예: before, playing, finish, cancelled, B, P, F, C, I, S, H, E 등)',
     required: false 
   })
   @IsOptional()
-  @IsEnum(GameState)
+  @IsString()
   state?: string;
 
   @ApiProperty({ example: '경기전', description: '경기 상태 텍스트', required: false })

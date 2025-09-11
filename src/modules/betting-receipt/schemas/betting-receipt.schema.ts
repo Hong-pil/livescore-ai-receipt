@@ -110,10 +110,7 @@ export class GameInfo {
   away_score: string;
 
   @ApiProperty({ example: 'before', description: '경기 상태' })
-  @Prop({ 
-    type: String, 
-    enum: Object.values(GameState)
-  })
+  @Prop({ type: String })
   state: string;
 
   @ApiProperty({ example: '경기전', description: '경기 상태 텍스트' })
