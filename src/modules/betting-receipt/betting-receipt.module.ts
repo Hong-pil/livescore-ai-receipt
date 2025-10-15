@@ -7,12 +7,13 @@ import { BettingReceipt, BettingReceiptSchema } from './schemas/betting-receipt.
 
 @Module({
   imports: [
+    // MongoDB의 betting_receipts 컬렉션 사용 준비
     MongooseModule.forFeature([
       { name: BettingReceipt.name, schema: BettingReceiptSchema }
     ]),
   ],
-  controllers: [BettingReceiptController],
-  providers: [BettingReceiptService],
+  controllers: [BettingReceiptController],  // 요청 받는 곳
+  providers: [BettingReceiptService],       // 비즈니스 로직 처리
   exports: [BettingReceiptService],
 })
 export class BettingReceiptModule {}

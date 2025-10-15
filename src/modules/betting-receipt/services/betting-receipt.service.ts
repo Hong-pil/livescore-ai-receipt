@@ -16,7 +16,23 @@ export class BettingReceiptService {
     private bettingReceiptModel: Model<BettingReceiptDocument>,
   ) {}
 
-  // 영수증 ID 생성 (RECEIPT_YYYYMMDDHHMISSXXX 형식)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  // ==================== 영수증 ID 생성 ====================
   private generateReceiptId(): string {
     const now = new Date();
     const year = now.getFullYear();
@@ -26,59 +42,254 @@ export class BettingReceiptService {
     const minute = String(now.getMinutes()).padStart(2, '0');
     const second = String(now.getSeconds()).padStart(2, '0');
     const random = String(Math.floor(Math.random() * 1000)).padStart(3, '0');
-    
+
     return `RECEIPT_${year}${month}${day}${hour}${minute}${second}${random}`;
   }
 
-  // 베팅 영수증 생성
-  async create(createBettingReceiptDto: CreateBettingReceiptDto): Promise<BettingReceipt> {
+  // ==================== predict_state 해석 함수 ====================
+  /**
+   * predict_state를 betting_type으로 변환
+   * @param predict_state - W(승), D(무), L(패), U(언더), O(오버)
+   * @param type_sc - H(핸디캡), U(언더오버), 공백(승무패)
+   * @returns betting_type - home, draw, away, handicap_home, handicap_away, under, over
+   */
+  private convertPredictStateToBettingType(
+    predict_state: string,
+    type_sc?: string,
+  ): string {
+    // 언더오버 타입인 경우
+    if (type_sc === 'U') {
+      if (predict_state === 'U') return 'under';
+      if (predict_state === 'O') return 'over';
+    }
+
+    // 핸디캡 타입인 경우
+    if (type_sc === 'H') {
+      if (predict_state === 'W') return 'handicap_home';
+      if (predict_state === 'L') return 'handicap_away';
+    }
+
+    // 일반 승무패인 경우
+    if (predict_state === 'W') return 'home';
+    if (predict_state === 'D') return 'draw';
+    if (predict_state === 'L') return 'away';
+
+    // 기본값 (예외 처리)
+    return 'home';
+  }
+
+  // ==================== 배당률 가져오기 함수 ====================
+  /**
+   * predict_state에 해당하는 배당률 추출
+   */
+  private getOddsByPredictState(
+    predict_state: string,
+    w_bet_rt: string,
+    d_bet_rt: string,
+    l_bet_rt: string,
+  ): string {
+    if (predict_state === 'W' || predict_state === 'U') return w_bet_rt;
+    if (predict_state === 'D') return d_bet_rt;
+    if (predict_state === 'L' || predict_state === 'O') return l_bet_rt;
+    return w_bet_rt; // 기본값
+  }
+
+  // ==================== 선택한 팀명 가져오기 함수 ====================
+  /**
+   * predict_state에 해당하는 팀명 추출
+   */
+  private getSelectedTeam(
+    predict_state: string,
+    home_team_name: string,
+    away_team_name: string,
+    type_sc?: string,
+  ): string {
+    // 언더오버인 경우
+    if (type_sc === 'U') {
+      return predict_state === 'U' ? '언더' : '오버';
+    }
+
+    // 승무패 또는 핸디캡
+    if (predict_state === 'W' || predict_state === 'U') return home_team_name;
+    if (predict_state === 'D') return '무승부';
+    if (predict_state === 'L' || predict_state === 'O') return away_team_name;
+
+    return home_team_name; // 기본값
+  }
+
+  // ==================== 배팅 아이템 생성 함수 ====================
+  /**
+   * calc_model과 selected_games를 기반으로 betting_items 생성
+   */
+  private createBettingItems(dto: CreateBettingReceiptDto) {
+    const { calc_model, selected_games } = dto;
+    const betAmountPerGame = Math.floor(
+      parseInt(calc_model.bet_price) / calc_model.bookmarks.length,
+    );
+
+    return calc_model.bookmarks.map((bookmark) => {
+      // 해당 게임 찾기
+      const game = selected_games.find(
+        (g) => g.game_no === bookmark.game_no,
+      );
+
+      if (!game) {
+        throw new BadRequestException(
+          `게임 번호 ${bookmark.game_no}에 해당하는 경기를 찾을 수 없습니다.`,
+        );
+      }
+
+      // betting_type 변환
+      const betting_type = this.convertPredictStateToBettingType(
+        bookmark.predict_state,
+        bookmark.type_sc,
+      );
+
+      // 배당률 추출
+      const odds = this.getOddsByPredictState(
+        bookmark.predict_state,
+        bookmark.w_bet_rt,
+        bookmark.d_bet_rt || '',
+        bookmark.l_bet_rt,
+      );
+
+      // 선택한 팀명
+      const selected_team = this.getSelectedTeam(
+        bookmark.predict_state,
+        game.home_team_name,
+        game.away_team_name,
+        bookmark.type_sc,
+      );
+
+      // 예상 배당금 계산
+      const expected_payout = Math.floor(
+        betAmountPerGame * parseFloat(odds),
+      );
+
+      return {
+        game_id: game.game_id,
+        betting_type,
+        selected_team,
+        odds,
+        betting_amount: betAmountPerGame,
+        expected_payout,
+      };
+    });
+  }
+
+  // ==================== 총 배당률 계산 함수 ====================
+  /**
+   * 모든 북마크의 배당률을 곱해서 총 배당률 계산
+   * (프로토 규칙: 1경기는 소수점 2자리, 2경기 이상은 소수점 1자리)
+   */
+  private calculateTotalOdds(bookmarks: any[]): string {
+    let totalOdds = 1.0;
+
+    bookmarks.forEach((bookmark) => {
+      const odds = this.getOddsByPredictState(
+        bookmark.predict_state,
+        bookmark.w_bet_rt,
+        bookmark.d_bet_rt || '',
+        bookmark.l_bet_rt,
+      );
+      totalOdds *= parseFloat(odds);
+    });
+
+    // 1경기인 경우: 소수점 2자리
+    if (bookmarks.length === 1) {
+      return totalOdds.toFixed(2);
+    }
+
+    // 2경기 이상: 소수점 1자리 (프로토 규칙: 버림 후 올림)
+    totalOdds = Math.floor(totalOdds * 100) / 100; // 소수점 2자리까지 버림
+    totalOdds = Math.ceil(totalOdds * 10) / 10;    // 소수점 1자리로 올림
+
+    return totalOdds.toFixed(1);
+  }
+
+  // ==================== 베팅 영수증 생성 (메인 함수) ====================
+  async create(
+    createBettingReceiptDto: CreateBettingReceiptDto,
+  ): Promise<BettingReceipt> {
     try {
-      // 베팅 금액과 예상 당첨 금액 검증
-      const totalBettingAmount = createBettingReceiptDto.betting_items.reduce(
-        (sum, item) => sum + item.betting_amount, 0
-      );
-      
-      if (totalBettingAmount !== createBettingReceiptDto.total_betting_amount) {
-        throw new BadRequestException('총 베팅 금액이 베팅 항목들의 합계와 일치하지 않습니다.');
+      const { calc_model, selected_games, type } = createBettingReceiptDto;
+
+      // ========== 1. 기본 검증 ==========
+      // 선택한 경기가 있는지 확인
+      if (!calc_model.bookmarks || calc_model.bookmarks.length === 0) {
+        throw new BadRequestException('선택한 경기가 없습니다.');
       }
 
-      // 최소 베팅 금액 검증 (각 항목별 500원 이상)
-      const invalidBettingItems = createBettingReceiptDto.betting_items.filter(
-        item => item.betting_amount < 500
-      );
-      
-      if (invalidBettingItems.length > 0) {
-        throw new BadRequestException('각 베팅 항목은 최소 500원 이상이어야 합니다.');
-      }
-
-      // 총 베팅 금액 최소값 검증 (500원 이상)
-      if (createBettingReceiptDto.total_betting_amount < 500) {
+      // 최소 베팅 금액 검증 (500원 이상)
+      const totalBettingAmount = parseInt(calc_model.bet_price);
+      if (totalBettingAmount < 500) {
         throw new BadRequestException('총 베팅 금액은 최소 500원 이상이어야 합니다.');
       }
 
-      // 영수증 ID 생성 (중복 확인)
+      // 게임 수와 선택한 게임 수가 일치하는지 확인
+      if (calc_model.bookmarks.length !== selected_games.length) {
+        throw new BadRequestException(
+          '선택한 경기 수와 게임 정보가 일치하지 않습니다.',
+        );
+      }
+
+      // ========== 2. 영수증 ID 생성 (중복 확인) ==========
       let receiptId: string = '';
       let isUnique = false;
       let attempts = 0;
-      
+
       while (!isUnique && attempts < 5) {
         receiptId = this.generateReceiptId();
-        const existingReceipt = await this.bettingReceiptModel.findOne({ receipt_id: receiptId });
+        const existingReceipt = await this.bettingReceiptModel.findOne({
+          receipt_id: receiptId,
+        });
         if (!existingReceipt) {
           isUnique = true;
         }
         attempts++;
       }
-      
+
       if (!isUnique || !receiptId) {
-        throw new ConflictException('영수증 ID 생성에 실패했습니다. 다시 시도해 주세요.');
+        throw new ConflictException(
+          '영수증 ID 생성에 실패했습니다. 다시 시도해 주세요.',
+        );
       }
 
+      // ========== 3. 비즈니스 로직 처리 ==========
+      // betting_items 생성 (서버에서 가공)
+      const bettingItems = this.createBettingItems(createBettingReceiptDto);
+
+      // 총 배당률 계산 (서버에서 계산)
+      const totalOdds = this.calculateTotalOdds(calc_model.bookmarks);
+
+      // 총 예상 배당금 계산
+      const totalExpectedPayout = Math.floor(
+        totalBettingAmount * parseFloat(totalOdds),
+      );
+
+      // ========== 4. 영수증 저장 ==========
       const bettingReceipt = new this.bettingReceiptModel({
-        ...createBettingReceiptDto,
         receipt_id: receiptId,
-        betting_type: createBettingReceiptDto.betting_type || 'proto',
+        user_no: createBettingReceiptDto.user_no,
+        betting_type: type, // 'P', 'F', 'A', 'B'
         status: 'pending',
+        
+        // 원본 데이터 저장 (AI 학습용)
+        original_data: {
+          round_info: createBettingReceiptDto.round_info,
+          calc_model: calc_model,
+        },
+        
+        // 가공된 데이터 저장 (화면 표시용)
+        selected_games: selected_games,
+        betting_items: bettingItems,
+        total_betting_amount: totalBettingAmount,
+        total_expected_payout: totalExpectedPayout,
+        total_odds: totalOdds,
+        
+        // 메타 정보
+        created_at: new Date(createBettingReceiptDto.create_date),
+        updated_at: new Date(),
       });
 
       return await bettingReceipt.save();
@@ -89,6 +300,40 @@ export class BettingReceiptService {
       throw error;
     }
   }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
 
   // 모든 영수증 조회 (필터링 및 페이징)
   async findAll(

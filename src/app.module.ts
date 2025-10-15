@@ -13,20 +13,20 @@ import { BettingReceiptModule } from './modules/betting-receipt/betting-receipt.
 
 @Module({
   imports: [
-    // 환경변수 설정
+    // 환경변수 (.env) 읽기
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
 
-    // TypeORM (MySQL) 설정
+    // // MySQL 연결 (TypeORM)
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: getTypeOrmConfig,
       inject: [ConfigService],
     }),
 
-    // Mongoose (MongoDB) 설정
+    // MongoDB 연결 (Mongoose)
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: getMongooseConfig,
@@ -36,7 +36,7 @@ import { BettingReceiptModule } from './modules/betting-receipt/betting-receipt.
     // 모듈들
     TodosMongoModule,
     TodosMySQLModule,
-    BettingReceiptModule,
+    BettingReceiptModule,   // 베팅 영수증 모듈 등록
   ],
   controllers: [AppController],
   providers: [AppService],
