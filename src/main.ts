@@ -21,9 +21,12 @@ async function bootstrap() {
   // Global Validation Pipe 설정
   app.useGlobalPipes(
     new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
+      whitelist: true,              // DTO에 정의되지 않은 속성 제거
+      forbidNonWhitelisted: false,  // ⭐ 추가 필드 허용 (에러 발생 안함)
+      transform: true,               // 자동 타입 변환
+      transformOptions: {
+        enableImplicitConversion: true,
+      },
     }),
   );
 
