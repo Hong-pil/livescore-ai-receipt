@@ -21,11 +21,17 @@ async function bootstrap() {
   // Global Validation Pipe 설정
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: false,             // ⭐ false로 변경 (추가 필드 허용)
+      whitelist: false,             // 추가 필드 허용
       forbidNonWhitelisted: false,  // 추가 필드 에러 발생 안함
       transform: true,               // 자동 타입 변환
       transformOptions: {
         enableImplicitConversion: true,
+      },
+      // ⭐ 핵심: unknown values를 허용하도록 설정
+      skipMissingProperties: false,
+      validationError: {
+        target: false,
+        value: false,
       },
     }),
   );
