@@ -156,8 +156,8 @@ export class BettingReceiptService {
       // 선택한 팀명
       const selected_team = this.getSelectedTeam(
         bookmark.predict_state,
-        game.home_team_name,
-        game.away_team_name,
+        game.home_team_name || '',
+        game.away_team_name || '',
         bookmark.type_sc,
       );
 
@@ -333,7 +333,7 @@ export class BettingReceiptService {
 
 
 
-  
+
 
   // 모든 영수증 조회 (필터링 및 페이징)
   async findAll(
