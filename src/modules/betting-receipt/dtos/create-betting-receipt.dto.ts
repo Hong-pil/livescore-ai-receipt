@@ -395,6 +395,37 @@ export class GameBetRtDto {
   hasFBetRt?: boolean;
 }
 
+// ==================== InjTime DTO ====================
+// 추가 시간 정보 DTO (축구에서 사용)
+export class InjTimeDto {
+  @ApiProperty({ 
+    example: '3', 
+    description: '연장전 추가 시간 (분)',
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  ot_inj_time?: string;
+
+  @ApiProperty({ 
+    example: '5', 
+    description: '후반전 추가 시간 (분)',
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  a_inj_time?: string;
+
+  @ApiProperty({ 
+    example: '2', 
+    description: '전반전 추가 시간 (분)',
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  f_inj_time?: string;
+}
+
 // ==================== 5. Game DTO (원본 Game 모델 전체) ====================
 export class GameDto {
   @ApiProperty({ example: 'OT2025331103238', description: '게임 ID' })
@@ -819,6 +850,51 @@ export class GameDto {
   @Type(() => GameBetRtDto)
   bet_rt?: GameBetRtDto;
 
+  @ApiProperty({ example: '', description: '현재 경기 남은 시간 (농구, 아이스하키, 미식축구에 사용)', required: false })
+  @IsOptional()
+  @IsString()
+  cur_time?: string;
+
+  @ApiProperty({ example: '', description: '농구 팀파울 (blank : 없음, 홈팀 : 1, 원정팀 : 2, 양팀 : 3)', required: false })
+  @IsOptional()
+  @IsString()
+  team_foul?: string;
+
+  @ApiProperty({ example: '', description: '경기진행 상태 코드 (아이스하키 : S_1PF(1P 종료), S_2PF(2P 종료), S_3PF(3P 종료), S_OT(연장), S_PSU(승부샷)', required: false })
+  @IsOptional()
+  @IsString()
+  state_txt_code?: string;
+
+  @ApiProperty({ 
+    description: '추가 시간 정보 (축구 경기에서 사용)', 
+    type: InjTimeDto,
+    required: false 
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => InjTimeDto)
+  injtime?: InjTimeDto;
+
+  @ApiProperty({ example: '', description: '회차 번호(최신 회차 번호)', required: false })
+  @IsOptional()
+  @IsString()
+  round_no?: string;
+
+  @ApiProperty({ example: '', description: '경기 번호', required: false })
+  @IsOptional()
+  @IsString()
+  game_no?: string;
+
+  @ApiProperty({ example: 'P', description: '프로토, 승무패 구분자(P:프로토, F:승무패)', required: false })
+  @IsOptional()
+  @IsString()
+  diviedend_sc?: string;
+
+  @ApiProperty({ example: '', description: '프로토 경기타입(N:일반, H:핸디캡, U:언더 오버) - 토토경기에서만 사용(P,F)', required: false })
+  @IsOptional()
+  @IsString()
+  type_sc?: string;
+
   @ApiProperty({ example: '1.71', description: '홈팀 배당률', required: false })
   @IsOptional()
   @IsString()
@@ -834,25 +910,125 @@ export class GameDto {
   @IsString()
   away_bet_rt?: string;
 
-  @ApiProperty({ example: '107', description: '라운드 번호' })
-  @IsString()
-  round_no: string;
-
-  @ApiProperty({ example: '006', description: '게임 번호' })
-  @IsString()
-  game_no: string;
-
-  @ApiProperty({ example: 'P', description: '배당 구분 (P:프로토)', required: false })
+  @ApiProperty({ example: '', description: '홈 배당률 상승 하락 FLAG(U:상승, D:하락, else : 변화 없음)', required: false })
   @IsOptional()
   @IsString()
-  diviedend_sc?: string;
+  home_bet_ud?: string;
 
-  @ApiProperty({ example: '', description: '타입 구분 (H:핸디캡, U:언더오버)', required: false })
+  @ApiProperty({ example: '', description: '무승부 배당률 상승 하락 FLAG(U:상승, D:하락, else : 변화 없음)', required: false })
   @IsOptional()
   @IsString()
-  type_sc?: string;
+  draw_bet_ud?: string;
 
-  // ... 필요한 다른 Game 필드들 추가 가능
+  @ApiProperty({ example: '', description: '원정 배당률 상승 하락 FLAG(U:상승, D:하락, else : 변화 없음)', required: false })
+  @IsOptional()
+  @IsString()
+  away_bet_ud?: string;
+
+  @ApiProperty({ example: '', description: '이전 홈 배당률(change_bet_rt_flag가 "Y"일 경우만 엘리멘트 내려감)', required: false })
+  @IsOptional()
+  @IsString()
+  before_home_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '이전 무승부 배당률(change_bet_rt_flag가 "Y"일 경우만 엘리멘트 내려감)', required: false })
+  @IsOptional()
+  @IsString()
+  before_draw_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '이전 원정 배당률(change_bet_rt_flag가 "Y"일 경우만 엘리멘트 내려감)', required: false })
+  @IsOptional()
+  @IsString()
+  before_away_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 홈 배당율', required: false })
+  @IsOptional()
+  @IsString()
+  f_home_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 무승부 배당률', required: false })
+  @IsOptional()
+  @IsString()
+  f_draw_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 원정 배당률', required: false })
+  @IsOptional()
+  @IsString()
+  f_away_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '해외 홈 배당률 상승 하락 FLAG(U:상승, D:하락, else : 변화 없음)', required: false })
+  @IsOptional()
+  @IsString()
+  f_home_bet_ud?: string;
+
+  @ApiProperty({ example: '', description: '해외 무승부 배당률 상승 하락 FLAG(U:상승, D:하락, else : 변화 없음)', required: false })
+  @IsOptional()
+  @IsString()
+  f_draw_bet_ud?: string;
+
+  @ApiProperty({ example: '', description: '해외 원정 배당률 상승 하락 FLAG(U:상승, D:하락, else : 변화 없음)', required: false })
+  @IsOptional()
+  @IsString()
+  f_away_bet_ud?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 핸디캡 수치', required: false })
+  @IsOptional()
+  @IsString()
+  f_handicap_score_cn?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 언더오버 수치', required: false })
+  @IsOptional()
+  @IsString()
+  f_underover_score_cn?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 이전 홈 배당률(change_bet_rt_flag가 "Y"일 경우만 엘리멘트 내려감)', required: false })
+  @IsOptional()
+  @IsString()
+  f_before_home_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 이전 무승부 배당률(change_bet_rt_flag가 "Y"일 경우만 엘리멘트 내려감)', required: false })
+  @IsOptional()
+  @IsString()
+  f_before_draw_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 이전 원정 배당률(change_bet_rt_flag가 "Y"일 경우만 엘리멘트 내려감)', required: false })
+  @IsOptional()
+  @IsString()
+  f_before_away_bet_rt?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 이전 핸디캡 수치(change_bet_rt_flag가 "Y"일 경우만 엘리멘트 내려감)', required: false })
+  @IsOptional()
+  @IsString()
+  f_before_handicap_score_cn?: string;
+
+  @ApiProperty({ example: '', description: '해외배당 이전 언더오버 수치(change_bet_rt_flag가 "Y"일 경우만 엘리멘트 내려감)', required: false })
+  @IsOptional()
+  @IsString()
+  f_before_underover_score_cn?: string;
+
+  @ApiProperty({ example: '', description: '배당률 변경 유무(Y:배팅률 변경됨, N:배팅률 변경 안됨)', required: false })
+  @IsOptional()
+  @IsString()
+  change_bet_rt_flag?: string;
+
+  @ApiProperty({ example: '', description: '이전 핸디캡 수치', required: false })
+  @IsOptional()
+  @IsString()
+  before_handicap_score_cn?: string;
+
+  @ApiProperty({ example: '', description: '이전 언더오버 수치', required: false })
+  @IsOptional()
+  @IsString()
+  before_underover_score_cn?: string;
+
+  @ApiProperty({ example: '', description: 'single_game_flag - Y : 한 경기만 선택 가능, else : 복수 경기 선택', required: false })
+  @IsOptional()
+  @IsString()
+  single_game_flag?: string;
+
+  @ApiProperty({ example: '', description: '오늘 UV', required: false })
+  @IsOptional()
+  @IsString()
+  uv_cn?: string;
 }
 
 // ==================== 메인 생성 DTO ====================
