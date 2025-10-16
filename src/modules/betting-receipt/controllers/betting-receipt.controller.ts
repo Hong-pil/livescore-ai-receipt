@@ -23,6 +23,8 @@ import {
   HttpStatus,
   ParseIntPipe,
   DefaultValuePipe,
+  UsePipes,
+  ValidationPipe,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -53,6 +55,13 @@ export class BettingReceiptController {
   // 4. 메서드들 (각 API 앤드포인트)
   @Post()
   @HttpCode(HttpStatus.CREATED) // 성공하면 201 Created 상태 코드 반환 (HTTP 표준에서 "새로운 리소스 생성 성공"은 201)
+  // ⭐ 이 엔드포인트만 validation 완화
+  @UsePipes(new ValidationPipe({
+    whitelist: false,
+    forbidNonWhitelisted: false,
+    transform: true,
+    skipMissingProperties: false,
+  }))
   // Swagger 문서화
   @ApiOperation({
     summary: '프로토 배팅 영수증 생성',
