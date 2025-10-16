@@ -9,7 +9,8 @@ import {
   IsEnum,
   Min,
   ArrayMinSize,
-  IsObject
+  IsObject,
+  IsBoolean
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { generateResponse } from '@/common/utils/response.util';
@@ -426,8 +427,192 @@ export class InjTimeDto {
   f_inj_time?: string;
 }
 
+// ==================== 1. 팀 전적 정보 DTO (야구 A타입에서 사용) ====================
+export class TeamRecordDto {
+  // ========== 홈팀 시즌 전적 ==========
+  @ApiProperty({ 
+    example: '45', 
+    description: '홈팀 시즌 승수', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  h_s_w?: string;
+
+  @ApiProperty({ 
+    example: '32', 
+    description: '홈팀 시즌 패수', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  h_s_l?: string;
+
+  @ApiProperty({ 
+    example: '8', 
+    description: '홈팀 상대팀 전적 승수', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  h_vs_w?: string;
+
+  @ApiProperty({ 
+    example: '5', 
+    description: '홈팀 상대팀 전적 패수', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  h_vs_l?: string;
+
+  @ApiProperty({ 
+    example: '3.45', 
+    description: '홈팀 시즌 평균자책점(ERA)', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  h_s_era?: string;
+
+  // ========== 원정팀 시즌 전적 ==========
+  @ApiProperty({ 
+    example: '38', 
+    description: '원정팀 시즌 승수', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  a_s_w?: string;
+
+  @ApiProperty({ 
+    example: '40', 
+    description: '원정팀 시즌 패수', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  a_s_l?: string;
+
+  @ApiProperty({ 
+    example: '5', 
+    description: '원정팀 상대팀 전적 승수', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  a_vs_w?: string;
+
+  @ApiProperty({ 
+    example: '8', 
+    description: '원정팀 상대팀 전적 패수', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  a_vs_l?: string;
+
+  @ApiProperty({ 
+    example: '4.12', 
+    description: '원정팀 시즌 평균자책점(ERA)', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  a_s_era?: string;
+
+  // ========== 승리/패전 투수 정보 (한국어) ==========
+  @ApiProperty({ 
+    example: '김광현', 
+    description: '승리투수 이름 (한국어)', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  game_w?: string;
+
+  @ApiProperty({ 
+    example: '박세웅', 
+    description: '패전투수 이름 (한국어)', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  game_l?: string;
+
+  // ========== 승리/패전 투수 정보 (영문) ==========
+  @ApiProperty({ 
+    example: 'Kim Kwang-hyun', 
+    description: '승리투수 이름 (영문)', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  game_w_en?: string;
+
+  @ApiProperty({ 
+    example: 'Park Se-woong', 
+    description: '패전투수 이름 (영문)', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  game_l_en?: string;
+
+  // ========== 승리/패전 투수 정보 (일본어) ==========
+  @ApiProperty({ 
+    example: 'キム・グァンヒョン', 
+    description: '승리투수 이름 (일본어)', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  game_w_ja?: string;
+
+  @ApiProperty({ 
+    example: 'パク・セウン', 
+    description: '패전투수 이름 (일본어)', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  game_l_ja?: string;
+
+  // ========== 팀 순위 ==========
+  @ApiProperty({ 
+    example: '2', 
+    description: '홈팀 순위', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  h_rank?: string;
+
+  @ApiProperty({ 
+    example: '5', 
+    description: '원정팀 순위', 
+    required: false 
+  })
+  @IsOptional()
+  @IsString()
+  a_rank?: string;
+}
+
+// ==================== 2. Topfix Type Enum ====================
+export enum TopfixType {
+  TOP_MOST = 'topMost',    // 최상단 고정
+  TOP = 'top',              // 상단 고정
+  BOTTOM = 'bottom',        // 하단 고정
+  HOT_MATCH = 'hotmatch',   // 핫매치
+  TOP_ALL = 'topAll',       // 전체 상단
+}
+
 // ==================== 5. Game DTO (원본 Game 모델 전체) ====================
 export class GameDto {
+  @ApiProperty({ example: '', description: '' })
+  @IsBoolean()
+  isGameDetail: boolean;
+  
   @ApiProperty({ example: 'OT2025331103238', description: '게임 ID' })
   @IsString()
   game_id: string;
@@ -1029,6 +1214,291 @@ export class GameDto {
   @IsOptional()
   @IsString()
   uv_cn?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  top_phrase_string_normal?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  top_phrase_string_handicap?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  top_phrase_string_underover?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  top_phrase_string?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  top_phrase_color?: string;
+
+  @ApiProperty({ 
+    description: '팀 전적 정보 (야구 경기, A타입에서 사용)', 
+    type: TeamRecordDto,
+    required: false 
+  })
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => TeamRecordDto)
+  teamRecord?: TeamRecordDto;
+
+  @ApiProperty({ 
+    example: 'topMost', 
+    description: '상단 고정 타입',
+    enum: TopfixType,
+    required: false 
+  })
+  @IsOptional()
+  @IsEnum(TopfixType)
+  topFixType?: TopfixType;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsBoolean()
+  isDisplayGameInfo?: boolean;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsBoolean()
+  isFoldLeagueMember?: boolean;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  detail_yn?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  rank_yn?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  btn_home_name?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  btn_away_name?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  vod_link?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  lineup_flag?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  broadcast_history_yn?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  p_record_flag?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  ani_info?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  action_info?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  betting_winning_yn?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  betting_hit_cnt?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  betting_answer_cnt?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  service_type?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  result_vs?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  result_re?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  result_rank?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  h_team_rank?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  a_team_rank?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  graphic_broadcast_url?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  graphic_default_flag?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  link_url?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  link_result_url?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  caster_type?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  caster_type_history?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  caster_id?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  caster_name?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  img_url?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  title_btn_color?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  title_btn_name?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  title_font_color?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  title_link_type?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  title_link_url?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  title_webview_link_title?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  tutorial_yn?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  tutorial_img_url?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  funfact_yn?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  funfact_upd_date?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  funfact_title?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  funfact_prediction?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  steller_win?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  steller_draw?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  steller_loss?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  vod_btn_type?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  naviFromAnotherGame?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsBoolean()
+  displayMatchDate?: boolean;
 }
 
 // ==================== 메인 생성 DTO ====================
