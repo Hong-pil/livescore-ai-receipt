@@ -16,13 +16,15 @@ import {
 } from '@nestjs/swagger';
 import { RecommendationService } from '../services/recommendation.service';
 import { RecommendationResult } from '../services/recommendation.service';
+import { TestDataGenerator } from '../../../scripts/generate-test-data'
 
 @ApiTags('🎯 경기 추천 시스템')
 @Controller('api/v1/recommendations')
 export class RecommendationController {
   constructor(
     private readonly recommendationService: RecommendationService,
-  ) {}
+    private readonly testDataGenerator: TestDataGenerator,
+  ) { }
 
   // ==================== 경기 추천 API ====================
   @Post('games')
@@ -499,6 +501,24 @@ export class RecommendationController {
       data: result,
       message: '테스트 추천이 생성되었습니다.',
       note: '이것은 테스트용 샘플 데이터를 사용한 결과입니다.',
+    };
+  }
+
+  // 테스트 데이터 생성
+  @Post('admin/generate-test-data')
+  @ApiOperation({
+    summary: '테스트 데이터 생성 (관리자용)',
+    description: '현실적인 테스트 영수증 데이터를 대량 생성합니다.'
+  })
+  async generateTestData(
+    @Body() body: { count: number }
+  ): Promise<any> {
+    const result = await this.testDataGenerator.generateTestData(body.count);
+
+    return {
+      success: true,
+      data: result,
+      message: `${result.total_receipts}개의 테스트 영수증이 생성되었습니다.`
     };
   }
 }
