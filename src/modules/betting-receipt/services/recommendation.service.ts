@@ -3,6 +3,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { BettingReceipt, BettingReceiptDocument } from '../schemas/betting-receipt.schema';
+import { RecommendationConfig, RecommendationConfigDocument } from '../schemas/recommendation-config.schema';
 
 // ==================== 추천 결과 인터페이스 ====================
 interface RecommendedGame {
@@ -33,6 +34,7 @@ export interface RecommendationResult {
     favorite_betting_type: string;
     most_selected_team: string;
     recent_activity_days: number;
+    user_accuracy: number;  // 추가
   };
   generated_at: Date;
 }
@@ -68,52 +70,149 @@ export class RecommendationService {
   constructor(
     @InjectModel(BettingReceipt.name)
     private bettingReceiptModel: Model<BettingReceiptDocument>,
+    @InjectModel(RecommendationConfig.name)
+    private recommendationConfigModel: Model<RecommendationConfigDocument>,
   ) {}
+
+  // ==================== 설정 관리 ====================
+  async getConfig(): Promise<RecommendationConfig> {
+    let config = await this.recommendationConfigModel.findOne({ is_active: true }).exec();
+    
+    if (!config) {
+      // 기본 설정 생성
+      config = await this.recommendationConfigModel.create({
+        league_weight: 30,
+        compe_weight: 25,
+        team_weight: 25,
+        time_weight: 10,
+        day_weight: 10,
+        recency_weight: 10,
+        accuracy_weight: 20,
+        betting_type_consistency_weight: 15,
+        odds_preference_weight: 10,
+        min_recommendation_score: 20,
+        max_recommendations: 5,
+        recency_days: 7,
+        version: 'v1.1',
+        is_active: true,
+      });
+    }
+    
+    return config;
+  }
+
+  async updateConfig(updateData: Partial<RecommendationConfig>): Promise<RecommendationConfig> {
+  // 가중치 합계 검증 (선택사항)
+  if (updateData.league_weight !== undefined || 
+      updateData.compe_weight !== undefined ||
+      updateData.team_weight !== undefined ||
+      updateData.time_weight !== undefined ||
+      updateData.day_weight !== undefined ||
+      updateData.recency_weight !== undefined ||
+      updateData.accuracy_weight !== undefined ||
+      updateData.betting_type_consistency_weight !== undefined ||
+      updateData.odds_preference_weight !== undefined) {
+    
+    const config = await this.getConfig();
+    const totalWeight = 
+      (updateData.league_weight ?? config.league_weight) +
+      (updateData.compe_weight ?? config.compe_weight) +
+      (updateData.team_weight ?? config.team_weight) +
+      (updateData.time_weight ?? config.time_weight) +
+      (updateData.day_weight ?? config.day_weight) +
+      (updateData.recency_weight ?? config.recency_weight) +
+      (updateData.accuracy_weight ?? config.accuracy_weight) +
+      (updateData.betting_type_consistency_weight ?? config.betting_type_consistency_weight) +
+      (updateData.odds_preference_weight ?? config.odds_preference_weight);
+
+    this.logger.log(`총 가중치: ${totalWeight}`);
+  }
+
+  // is_active: true인 설정을 찾아서 업데이트
+  const updatedConfig = await this.recommendationConfigModel.findOneAndUpdate(
+    { is_active: true },
+    { $set: updateData },
+    { new: true, runValidators: true, upsert: false }
+  ).exec();
+
+  if (!updatedConfig) {
+    // 설정이 없으면 새로 생성
+    const newConfig = await this.recommendationConfigModel.create({
+      ...updateData,
+      is_active: true,
+      version: updateData.version || 'v1.1',
+    });
+    return newConfig;
+  }
+
+  return updatedConfig;
+}
 
   // ==================== 메인: 경기 추천 ====================
   async getRecommendations(
-    userNo: string,
-    availableGames: any[], // 현재 배팅 가능한 경기 목록 (앱에서 전달)
-  ): Promise<RecommendationResult> {
-    this.logger.log(`유저 ${userNo}에 대한 추천 생성 시작`);
+  userNo: string,
+  availableGames: any[],
+): Promise<RecommendationResult> {
+  this.logger.log(`유저 ${userNo}에 대한 추천 생성 시작`);
 
-    // 1. 유저의 과거 배팅 이력 조회 (최근 6개월)
-    const sixMonthsAgo = new Date();
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  // 설정 가져오기
+  const config = await this.getConfig();
 
-    const receipts = await this.bettingReceiptModel
-      .find({
-        user_no: userNo,
-        createdAt: { $gte: sixMonthsAgo },
-      })
-      .sort({ createdAt: -1 })
-      .exec();
+  // 1. 유저의 과거 배팅 이력 조회 (최근 6개월)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
-    if (receipts.length === 0) {
-      this.logger.warn(`유저 ${userNo}의 배팅 이력이 없습니다.`);
-      return this.getDefaultRecommendations(userNo, availableGames);
-    }
-
-    // 2. 유저 패턴 분석
-    const pattern = this.analyzeUserPattern(receipts);
-
-    // 3. 현재 가능한 경기들에 점수 매기기
-    const scoredGames = this.scoreGames(availableGames, pattern, receipts);
-
-    // 4. 상위 N개 추천
-    const topRecommendations = scoredGames
-      .sort((a, b) => b.confidence_score - a.confidence_score)
-      .slice(0, 5); // 상위 5개만
-
-    // 5. 유저 분석 요약
-    const analysis = this.generateAnalysis(pattern, receipts);
-
-    return {
+  const receipts = await this.bettingReceiptModel
+    .find({
       user_no: userNo,
-      recommended_games: topRecommendations,
-      analysis,
-      generated_at: new Date(),
-    };
+      createdAt: { $gte: sixMonthsAgo },
+    })
+    .sort({ createdAt: -1 })
+    .exec();
+
+  if (receipts.length === 0) {
+    this.logger.warn(`유저 ${userNo}의 배팅 이력이 없습니다.`);
+    return this.getDefaultRecommendations(userNo, availableGames, config);
+  }
+
+  // 2. 유저 패턴 분석
+  const pattern = this.analyzeUserPattern(receipts);
+
+  // 3. 유저 정확도 계산
+  const userAccuracy = this.calculateUserAccuracy(receipts);
+
+  // 4. 현재 가능한 경기들에 점수 매기기
+  const scoredGames = this.scoreGames(availableGames, pattern, receipts, userAccuracy, config);
+
+  // 5. 상위 N개 추천
+  const topRecommendations = scoredGames
+    .filter(game => game.confidence_score >= config.min_recommendation_score)
+    .sort((a, b) => b.confidence_score - a.confidence_score)
+    .slice(0, config.max_recommendations);
+
+  // 6. 유저 분석 요약 (수정: 이미 user_accuracy가 포함되어 있음)
+  const analysis = this.generateAnalysis(pattern, receipts);
+
+  return {
+    user_no: userNo,
+    recommended_games: topRecommendations,
+    analysis, // 이미 user_accuracy 포함됨
+    generated_at: new Date(),
+  };
+}
+
+  // ==================== 유저 정확도 계산 ====================
+  private calculateUserAccuracy(receipts: BettingReceiptDocument[]): number {
+    if (receipts.length === 0) return 0;
+
+    const completedReceipts = receipts.filter(r => 
+      r.status === 'won' || r.status === 'lost'
+    );
+
+    if (completedReceipts.length === 0) return 0;
+
+    const wonCount = completedReceipts.filter(r => r.status === 'won').length;
+    return wonCount / completedReceipts.length;
   }
 
   // ==================== 유저 패턴 분석 ====================
@@ -211,132 +310,155 @@ export class RecommendationService {
     return pattern;
   }
 
-  // ==================== 경기 점수 매기기 ====================
+  // ==================== 경기 점수 매기기 (수정) ====================
   private scoreGames(
     availableGames: any[],
     pattern: UserPattern,
     receipts: BettingReceiptDocument[],
+    userAccuracy: number,
+    config: RecommendationConfig,
   ): RecommendedGame[] {
-    return availableGames
-      .map((game) => {
-        let score = 0;
-        const reasons: string[] = [];
+    return availableGames.map((game) => {
+      let score = 0;
+      const reasons: string[] = [];
 
-        // 1. 리그 선호도 점수 (30점)
-        const leagueData = pattern.leagues.get(game.league_name);
-        if (leagueData) {
-          const leagueScore = Math.min(
-            30,
-            (leagueData.count / receipts.length) * 30 +
-              leagueData.recent_count * 5,
-          );
-          score += leagueScore;
-          if (leagueData.count > 3) {
-            reasons.push(
-              `${game.league_name} 리그를 ${leagueData.count}회 선택하셨습니다`,
-            );
-          }
-        }
-
-        // 2. 종목 선호도 점수 (25점)
-        const compeData = pattern.compes.get(game.compe);
-        if (compeData) {
-          const compeScore = Math.min(
-            25,
-            (compeData.count / receipts.length) * 25 + compeData.recent_count * 4,
-          );
-          score += compeScore;
-          if (compeData.recent_count > 2) {
-            reasons.push(
-              `최근 ${game.compe} 경기를 자주 선택하셨습니다`,
-            );
-          }
-        }
-
-        // 3. 팀 선호도 점수 (25점)
-        const homeTeamData = pattern.teams.get(game.home_team_name);
-        const awayTeamData = pattern.teams.get(game.away_team_name);
-        
-        if (homeTeamData) {
-          score += Math.min(15, homeTeamData.count * 3 + homeTeamData.recent_count * 2);
-          if (homeTeamData.count > 2) {
-            reasons.push(`${game.home_team_name}을(를) 좋아하시는 것 같습니다`);
-          }
-        }
-        
-        if (awayTeamData) {
-          score += Math.min(10, awayTeamData.count * 3 + awayTeamData.recent_count * 2);
-          if (awayTeamData.count > 2) {
-            reasons.push(`${game.away_team_name}을(를) 좋아하시는 것 같습니다`);
-          }
-        }
-
-        // 4. 시간대 선호도 점수 (10점)
-        const timeCount = pattern.time_preferences.get(game.match_time) || 0;
-        if (timeCount > 0) {
-          score += Math.min(10, timeCount * 2);
-          if (timeCount > 3) {
-            reasons.push(`${game.match_time} 시간대 경기를 선호하십니다`);
-          }
-        }
-
-        // 5. 요일 선호도 점수 (10점)
-        const dayOfWeek = new Date(game.match_date).toLocaleDateString('ko-KR', {
-          weekday: 'short',
-        });
-        const dayCount = pattern.day_preferences.get(dayOfWeek) || 0;
-        if (dayCount > 0) {
-          score += Math.min(10, dayCount * 2);
-        }
-
-        // 6. 최근성 보너스 (최근 7일 내 같은 리그 선택했으면 +10점)
-        const sevenDaysAgo = new Date();
-        sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-        const recentSameLeague = receipts.some(
-          (r) =>
-            r.createdAt >= sevenDaysAgo &&
-            r.selected_games.some((g: any) => g.league_name === game.league_name),
+      // 1. 리그 선호도 점수
+      const leagueData = pattern.leagues.get(game.league_name);
+      if (leagueData) {
+        const leagueScore = Math.min(
+          config.league_weight,
+          (leagueData.count / receipts.length) * config.league_weight +
+            leagueData.recent_count * 5,
         );
-        if (recentSameLeague) {
-          score += 10;
-          reasons.push('최근 관심을 보인 리그입니다');
+        score += leagueScore;
+        if (leagueData.count > 3) {
+          reasons.push(`${game.league_name} 리그를 ${leagueData.count}회 선택`);
         }
+      }
 
-        // 추천 배팅 타입 결정
-        const recommendedBettingType = this.determineRecommendedBettingType(
-          game,
-          pattern,
+      // 2. 종목 선호도 점수
+      const compeData = pattern.compes.get(game.compe);
+      if (compeData) {
+        const compeScore = Math.min(
+          config.compe_weight,
+          (compeData.count / receipts.length) * config.compe_weight + compeData.recent_count * 4,
         );
+        score += compeScore;
+        if (compeData.recent_count > 2) {
+          reasons.push(`최근 ${game.compe} 경기를 자주 선택`);
+        }
+      }
 
-        // 빈도 계산
-        const frequency =
-          (leagueData?.count || 0) +
-          (homeTeamData?.count || 0) +
-          (awayTeamData?.count || 0);
+      // 3. 팀 선호도 점수
+      const homeTeamData = pattern.teams.get(game.home_team_name);
+      const awayTeamData = pattern.teams.get(game.away_team_name);
+      
+      if (homeTeamData) {
+        score += Math.min(config.team_weight * 0.6, homeTeamData.count * 3 + homeTeamData.recent_count * 2);
+        if (homeTeamData.count > 2) {
+          reasons.push(`${game.home_team_name} 선호`);
+        }
+      }
+      
+      if (awayTeamData) {
+        score += Math.min(config.team_weight * 0.4, awayTeamData.count * 3 + awayTeamData.recent_count * 2);
+        if (awayTeamData.count > 2) {
+          reasons.push(`${game.away_team_name} 선호`);
+        }
+      }
 
-        const recentCount =
-          (leagueData?.recent_count || 0) +
-          (homeTeamData?.recent_count || 0) +
-          (awayTeamData?.recent_count || 0);
+      // 4. 시간대 선호도 점수
+      const timeCount = pattern.time_preferences.get(game.match_time) || 0;
+      if (timeCount > 0) {
+        score += Math.min(config.time_weight, timeCount * 2);
+        if (timeCount > 3) {
+          reasons.push(`${game.match_time} 시간대 선호`);
+        }
+      }
 
-        return {
-          game_id: game.game_id,
-          game_no: game.game_no,
-          league_name: game.league_name,
-          league_id: game.league_id,
-          compe: game.compe,
-          home_team_name: game.home_team_name,
-          away_team_name: game.away_team_name,
-          match_date: game.match_date,
-          match_time: game.match_time,
-          recommended_betting_type: recommendedBettingType,
-          confidence_score: Math.min(100, Math.round(score)),
-          reason: reasons.join(', ') || '새로운 경기입니다',
-          frequency,
-          recent_selection_count: recentCount,
-        };
-      })
-      .filter((game) => game.confidence_score > 20); // 20점 이하는 제외
+      // 5. 요일 선호도 점수
+      const dayOfWeek = new Date(game.match_date).toLocaleDateString('ko-KR', {
+        weekday: 'short',
+      });
+      const dayCount = pattern.day_preferences.get(dayOfWeek) || 0;
+      if (dayCount > 0) {
+        score += Math.min(config.day_weight, dayCount * 2);
+      }
+
+      // 6. 최근성 보너스
+      const recentDate = new Date();
+      recentDate.setDate(recentDate.getDate() - config.recency_days);
+      const recentSameLeague = receipts.some(
+        (r) =>
+          r.createdAt >= recentDate &&
+          r.selected_games.some((g: any) => g.league_name === game.league_name),
+      );
+      if (recentSameLeague) {
+        score += config.recency_weight;
+        reasons.push('최근 관심 리그');
+      }
+
+      // 7. 유저 정확도 보너스 (높은 정확도일수록 높은 점수)
+      score += userAccuracy * config.accuracy_weight;
+      if (userAccuracy > 0.5) {
+        reasons.push(`적중률 ${Math.round(userAccuracy * 100)}%`);
+      }
+
+      // 8. 배팅 타입 일관성
+      const recommendedBettingType = this.determineRecommendedBettingType(game, pattern);
+      const bettingTypeData = pattern.betting_types.get(recommendedBettingType);
+      if (bettingTypeData) {
+        score += Math.min(
+          config.betting_type_consistency_weight,
+          (bettingTypeData.count / receipts.length) * config.betting_type_consistency_weight
+        );
+      }
+
+      // 9. 배당률 선호도 (평균 배당률 분석)
+      const avgOdds = this.calculateAverageOdds(receipts);
+      const gameOdds = parseFloat(game.home_bet_rt || '1.5');
+      const oddsDiff = Math.abs(gameOdds - avgOdds);
+      const oddsScore = Math.max(0, config.odds_preference_weight - oddsDiff * 2);
+      score += oddsScore;
+
+      const frequency =
+        (leagueData?.count || 0) +
+        (homeTeamData?.count || 0) +
+        (awayTeamData?.count || 0);
+
+      const recentCount =
+        (leagueData?.recent_count || 0) +
+        (homeTeamData?.recent_count || 0) +
+        (awayTeamData?.recent_count || 0);
+
+      return {
+        game_id: game.game_id,
+        game_no: game.game_no,
+        league_name: game.league_name,
+        league_id: game.league_id,
+        compe: game.compe,
+        home_team_name: game.home_team_name,
+        away_team_name: game.away_team_name,
+        match_date: game.match_date,
+        match_time: game.match_time,
+        recommended_betting_type: recommendedBettingType,
+        confidence_score: Math.min(100, Math.round(score)),
+        reason: reasons.join(', ') || '새로운 경기',
+        frequency,
+        recent_selection_count: recentCount,
+      };
+    });
+  }
+
+  // ==================== 평균 배당률 계산 ====================
+  private calculateAverageOdds(receipts: BettingReceiptDocument[]): number {
+    if (receipts.length === 0) return 2.0;
+
+    const totalOdds = receipts.reduce((sum, receipt) => {
+      return sum + parseFloat(receipt.total_odds || '2.0');
+    }, 0);
+
+    return totalOdds / receipts.length;
   }
 
   // ==================== 추천 배팅 타입 결정 ====================
@@ -376,76 +498,79 @@ export class RecommendationService {
 
   // ==================== 분석 요약 생성 ====================
   private generateAnalysis(
-    pattern: UserPattern,
-    receipts: BettingReceiptDocument[],
-  ): RecommendationResult['analysis'] {
-    // 가장 많이 선택한 리그
-    let favoriteLeague = '';
-    let maxLeagueCount = 0;
-    pattern.leagues.forEach((data, league) => {
-      if (data.count > maxLeagueCount) {
-        maxLeagueCount = data.count;
-        favoriteLeague = league;
-      }
-    });
+  pattern: UserPattern,
+  receipts: BettingReceiptDocument[],
+): RecommendationResult['analysis'] {
+  // 가장 많이 선택한 리그
+  let favoriteLeague = '';
+  let maxLeagueCount = 0;
+  pattern.leagues.forEach((data, league) => {
+    if (data.count > maxLeagueCount) {
+      maxLeagueCount = data.count;
+      favoriteLeague = league;
+    }
+  });
 
-    // 가장 많이 선택한 종목
-    let favoriteCompe = '';
-    let maxCompeCount = 0;
-    pattern.compes.forEach((data, compe) => {
-      if (data.count > maxCompeCount) {
-        maxCompeCount = data.count;
-        favoriteCompe = compe;
-      }
-    });
+  // 가장 많이 선택한 종목
+  let favoriteCompe = '';
+  let maxCompeCount = 0;
+  pattern.compes.forEach((data, compe) => {
+    if (data.count > maxCompeCount) {
+      maxCompeCount = data.count;
+      favoriteCompe = compe;
+    }
+  });
 
-    // 가장 많이 사용한 배팅 타입
-    let favoriteBettingType = '';
-    let maxBettingTypeCount = 0;
-    pattern.betting_types.forEach((data, type) => {
-      if (data.count > maxBettingTypeCount) {
-        maxBettingTypeCount = data.count;
-        favoriteBettingType = type;
-      }
-    });
+  // 가장 많이 사용한 배팅 타입
+  let favoriteBettingType = '';
+  let maxBettingTypeCount = 0;
+  pattern.betting_types.forEach((data, type) => {
+    if (data.count > maxBettingTypeCount) {
+      maxBettingTypeCount = data.count;
+      favoriteBettingType = type;
+    }
+  });
 
-    // 가장 많이 선택한 팀
-    let mostSelectedTeam = '';
-    let maxTeamCount = 0;
-    pattern.teams.forEach((data, team) => {
-      if (data.count > maxTeamCount) {
-        maxTeamCount = data.count;
-        mostSelectedTeam = team;
-      }
-    });
+  // 가장 많이 선택한 팀
+  let mostSelectedTeam = '';
+  let maxTeamCount = 0;
+  pattern.teams.forEach((data, team) => {
+    if (data.count > maxTeamCount) {
+      maxTeamCount = data.count;
+      mostSelectedTeam = team;
+    }
+  });
 
-    // 최근 활동 일수
-    const oldestReceipt = receipts[receipts.length - 1];
-    const newestReceipt = receipts[0];
-    const daysDiff = Math.floor(
-      (newestReceipt.createdAt.getTime() - oldestReceipt.createdAt.getTime()) /
-        (1000 * 60 * 60 * 24),
-    );
+  // 최근 활동 일수
+  const oldestReceipt = receipts[receipts.length - 1];
+  const newestReceipt = receipts[0];
+  const daysDiff = Math.floor(
+    (newestReceipt.createdAt.getTime() - oldestReceipt.createdAt.getTime()) /
+      (1000 * 60 * 60 * 24),
+  );
 
-    return {
-      total_receipts: receipts.length,
-      favorite_league: favoriteLeague,
-      favorite_compe: favoriteCompe,
-      favorite_betting_type: favoriteBettingType,
-      most_selected_team: mostSelectedTeam,
-      recent_activity_days: daysDiff,
-    };
-  }
+  // 유저 정확도 계산 추가
+  const userAccuracy = this.calculateUserAccuracy(receipts);
+
+  return {
+    total_receipts: receipts.length,
+    favorite_league: favoriteLeague,
+    favorite_compe: favoriteCompe,
+    favorite_betting_type: favoriteBettingType,
+    most_selected_team: mostSelectedTeam,
+    recent_activity_days: daysDiff,
+    user_accuracy: Math.round(userAccuracy * 100), // 추가
+  };
+}
 
   // ==================== 신규 유저 기본 추천 ====================
   private getDefaultRecommendations(
     userNo: string,
     availableGames: any[],
+    config: RecommendationConfig,
   ): RecommendationResult {
-    // 전체 유저의 인기 경기 기반으로 추천 (TODO: 나중에 구현)
-    // 지금은 그냥 상위 3개만 랜덤 추천
     const randomGames = availableGames
-      .slice(0, 3)
+      .slice(0, config.max_recommendations)
       .map((game) => ({
         game_id: game.game_id,
         game_no: game.game_no,
@@ -458,7 +583,7 @@ export class RecommendationService {
         match_time: game.match_time,
         recommended_betting_type: 'home',
         confidence_score: 50,
-        reason: '인기 경기입니다',
+        reason: '인기 경기',
         frequency: 0,
         recent_selection_count: 0,
       }));
@@ -473,6 +598,7 @@ export class RecommendationService {
         favorite_betting_type: '-',
         most_selected_team: '-',
         recent_activity_days: 0,
+        user_accuracy: 0,
       },
       generated_at: new Date(),
     };

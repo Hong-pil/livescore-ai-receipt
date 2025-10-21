@@ -6,6 +6,7 @@ import { RecommendationController } from './controllers/recommendation.controlle
 import { BettingReceiptService } from './services/betting-receipt.service';
 import { RecommendationService } from './services/recommendation.service';
 import { BettingReceipt, BettingReceiptSchema } from './schemas/betting-receipt.schema';
+import { RecommendationConfig, RecommendationConfigSchema } from './schemas/recommendation-config.schema';
 import { TestDataGenerator } from '../../scripts/generate-test-data';
 
 @Module({
@@ -13,19 +14,20 @@ import { TestDataGenerator } from '../../scripts/generate-test-data';
     // MongoDB의 betting_receipts 컬렉션 사용 준비
     // Schema: MongoDB에 저장될 데이터 형식 정의
     MongooseModule.forFeature([
-      { name: BettingReceipt.name, schema: BettingReceiptSchema }
+      { name: BettingReceipt.name, schema: BettingReceiptSchema },
+      { name: RecommendationConfig.name, schema: RecommendationConfigSchema },
     ]),
   ],
   controllers: [
     BettingReceiptController,
     RecommendationController
-  ],  // 요청 받는 곳
+  ],  
     
   providers: [
     BettingReceiptService,
     RecommendationService,
     TestDataGenerator,
-  ],       // 비즈니스 로직 처리
+  ],
   exports: [
     BettingReceiptService,
     RecommendationService,

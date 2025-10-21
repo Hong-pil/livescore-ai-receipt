@@ -7,6 +7,7 @@ import {
   Param,
   Query,
   Res,
+  Put,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
@@ -325,75 +326,95 @@ export class RecommendationController {
 
   // ==================== 추천 알고리즘 설명 조회 ====================
   @Get('algorithm/info')
-  @ApiOperation({
-    summary: '추천 알고리즘 설명',
-    description: '현재 사용 중인 추천 알고리즘의 상세 설명을 제공합니다.',
-  })
-  @ApiResponse({
-    status: 200,
-    description: '알고리즘 설명',
-  })
-  getAlgorithmInfo() {
-    return {
-      success: true,
-      data: {
-        version: '1.0.0',
-        type: 'Rule-based Algorithm',
-        description: '사용자의 과거 배팅 이력을 기반으로 규칙 기반 추천을 제공합니다.',
-        scoring_weights: {
-          league_preference: {
-            weight: 30,
-            description: '자주 선택한 리그에 높은 점수 부여',
-          },
-          compe_preference: {
-            weight: 25,
-            description: '자주 선택한 종목에 높은 점수 부여',
-          },
-          team_preference: {
-            weight: 25,
-            description: '자주 선택한 팀이 포함된 경기에 높은 점수 부여',
-          },
-          time_preference: {
-            weight: 10,
-            description: '선호하는 시간대 경기에 가산점',
-          },
-          day_preference: {
-            weight: 10,
-            description: '선호하는 요일 경기에 가산점',
-          },
-          recency_bonus: {
-            weight: 10,
-            description: '최근 7일 내 선택한 리그에 보너스 점수',
-          },
+@ApiOperation({
+  summary: '추천 알고리즘 설명',
+  description: '현재 사용 중인 추천 알고리즘의 상세 설명을 제공합니다.',
+})
+@ApiResponse({
+  status: 200,
+  description: '알고리즘 설명',
+})
+async getAlgorithmInfo() {
+  const config = await this.recommendationService.getConfig();
+  
+  return {
+    success: true,
+    data: {
+      version: config.version,
+      type: 'Rule-based Algorithm with Dynamic Weights',
+      description: '사용자의 과거 배팅 이력을 기반으로 가중치 기반 추천을 제공합니다.',
+      current_weights: {
+        league_preference: {
+          weight: config.league_weight,
+          description: '자주 선택한 리그에 높은 점수 부여',
         },
-        data_range: '최근 6개월 배팅 이력',
-        recommendation_count: '상위 5개 경기',
-        minimum_score: 20,
-        features: [
-          '리그별 선택 빈도 분석',
-          '종목별 선택 빈도 분석',
-          '팀별 선택 빈도 분석',
-          '배팅 타입 선호도 분석',
-          '시간대별 선호도 분석',
-          '요일별 선호도 분석',
-          '최근 30일 가중치 적용',
-          '종목 조합 패턴 분석',
-        ],
-        limitations: [
-          '신규 유저는 기본 추천만 제공',
-          '배팅 이력이 적으면 정확도 낮음 (최소 3개 이상 권장)',
-          '적중률 기반 추천은 아직 미구현',
-        ],
-        next_features: [
-          '적중률 기반 가중치 추가',
-          '시간대별 성공률 분석',
-          '배당률 선호도 분석',
-          'AI 모델 하이브리드',
-        ],
+        compe_preference: {
+          weight: config.compe_weight,
+          description: '자주 선택한 종목에 높은 점수 부여',
+        },
+        team_preference: {
+          weight: config.team_weight,
+          description: '자주 선택한 팀이 포함된 경기에 높은 점수 부여',
+        },
+        time_preference: {
+          weight: config.time_weight,
+          description: '선호하는 시간대 경기에 가산점',
+        },
+        day_preference: {
+          weight: config.day_weight,
+          description: '선호하는 요일 경기에 가산점',
+        },
+        recency_bonus: {
+          weight: config.recency_weight,
+          description: `최근 ${config.recency_days}일 내 선택한 리그에 보너스 점수`,
+        },
+        user_accuracy: {
+          weight: config.accuracy_weight,
+          description: '유저 적중률에 따른 가중치 (높을수록 신뢰도 높음)',
+        },
+        betting_type_consistency: {
+          weight: config.betting_type_consistency_weight,
+          description: '일관된 배팅 타입 선호도',
+        },
+        odds_preference: {
+          weight: config.odds_preference_weight,
+          description: '선호하는 배당률 패턴 분석',
+        },
       },
-      message: '추천 알고리즘 정보가 조회되었습니다.',
-    };
-  }
+      settings: {
+        data_range: '최근 6개월 배팅 이력',
+        recommendation_count: config.max_recommendations,
+        minimum_score: config.min_recommendation_score,
+        recency_days: config.recency_days,
+      },
+      features: [
+        '리그별 선택 빈도 분석',
+        '종목별 선택 빈도 분석',
+        '팀별 선택 빈도 분석',
+        '배팅 타입 선호도 분석',
+        '시간대별 선호도 분석',
+        '요일별 선호도 분석',
+        '최근 30일 가중치 적용',
+        '종목 조합 패턴 분석',
+        '유저 적중률 기반 신뢰도 분석',
+        '배당률 선호도 패턴 분석',
+        '배팅 타입 일관성 분석',
+      ],
+      limitations: [
+        '신규 유저는 기본 추천만 제공',
+        '배팅 이력이 적으면 정확도 낮음 (최소 5개 이상 권장)',
+        '실시간 경기 상황은 반영하지 않음',
+      ],
+      next_features: [
+        '시간대별 성공률 분석',
+        'AI 모델 하이브리드',
+        '실시간 배당률 변동 추적',
+        '경기 결과 예측 모델 통합',
+      ],
+    },
+    message: '추천 알고리즘 정보가 조회되었습니다.',
+  };
+}
 
   // ==================== 추천 테스트 API (개발용) ====================
   @Get('test/:userNo')
@@ -526,12 +547,12 @@ export class RecommendationController {
 
   // ==================== 시각화 대시보드 ====================
   @Get('dashboard')
-  @ApiOperation({
-    summary: '📊 테스트 데이터 시각화 대시보드',
-    description: '생성된 테스트 데이터를 시각적으로 분석하는 대시보드를 제공합니다.'
-  })
-  async getDashboard(@Res() res: Response) {
-    const html = `
+@ApiOperation({
+  summary: '📊 테스트 데이터 시각화 대시보드',
+  description: '생성된 테스트 데이터를 시각적으로 분석하는 대시보드를 제공합니다.'
+})
+async getDashboard(@Res() res: Response) {
+  const html = `
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -558,12 +579,195 @@ export class RecommendationController {
       margin: 0 auto;
     }
 
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 30px;
+    }
+
     h1 {
       color: white;
-      text-align: center;
-      margin-bottom: 30px;
       font-size: 2.5em;
       text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .config-btn {
+      padding: 15px 30px;
+      background: white;
+      color: #667eea;
+      border: none;
+      border-radius: 10px;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+      transition: all 0.3s ease;
+    }
+
+    .config-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 7px 20px rgba(0,0,0,0.3);
+    }
+
+    /* 모달 스타일 */
+    .modal {
+      display: none;
+      position: fixed;
+      z-index: 1000;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0,0,0,0.5);
+      animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+
+    .modal-content {
+      background-color: white;
+      margin: 5% auto;
+      padding: 30px;
+      border-radius: 15px;
+      width: 90%;
+      max-width: 800px;
+      max-height: 80vh;
+      overflow-y: auto;
+      box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+      animation: slideIn 0.3s;
+    }
+
+    @keyframes slideIn {
+      from { transform: translateY(-50px); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+
+    .modal-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 25px;
+      padding-bottom: 15px;
+      border-bottom: 2px solid #eee;
+    }
+
+    .modal-title {
+      font-size: 1.8em;
+      color: #333;
+      font-weight: bold;
+    }
+
+    .close-btn {
+      font-size
+       font-size: 2em;
+      color: #999;
+      cursor: pointer;
+      background: none;
+      border: none;
+      transition: color 0.3s;
+    }
+
+    .close-btn:hover {
+      color: #333;
+    }
+
+    .config-form {
+      display: grid;
+      gap: 20px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .form-group label {
+      font-weight: 600;
+      color: #333;
+      font-size: 0.95em;
+    }
+
+    .form-group input {
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 1em;
+      transition: border-color 0.3s;
+    }
+
+    .form-group input:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+
+    .form-group small {
+      color: #666;
+      font-size: 0.85em;
+    }
+
+    .weight-group {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+      padding: 20px;
+      background: #f8f9fa;
+      border-radius: 10px;
+    }
+
+    .total-weight {
+      text-align: center;
+      padding: 15px;
+      background: #e3f2fd;
+      border-radius: 8px;
+      margin: 15px 0;
+      font-size: 1.1em;
+      font-weight: bold;
+    }
+
+    .total-weight.warning {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 15px;
+      margin-top: 25px;
+    }
+
+    .btn {
+      flex: 1;
+      padding: 15px;
+      border: none;
+      border-radius: 8px;
+      font-size: 1.1em;
+      font-weight: bold;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: #e0e0e0;
+      color: #333;
+    }
+
+    .btn-secondary:hover {
+      background: #d0d0d0;
     }
 
     .stats-grid {
@@ -683,6 +887,30 @@ export class RecommendationController {
       color: #856404;
     }
 
+    .success-toast {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: #28a745;
+      color: white;
+      padding: 20px 30px;
+      border-radius: 10px;
+      box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+      z-index: 2000;
+      animation: slideInRight 0.5s, slideOutRight 0.5s 2.5s;
+      display: none;
+    }
+
+    @keyframes slideInRight {
+      from { transform: translateX(400px); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+
+    @keyframes slideOutRight {
+      from { transform: translateX(0); opacity: 1; }
+      to { transform: translateX(400px); opacity: 0; }
+    }
+
     @media (max-width: 768px) {
       .charts-grid {
         grid-template-columns: 1fr;
@@ -691,12 +919,20 @@ export class RecommendationController {
       h1 {
         font-size: 1.8em;
       }
+
+      .header {
+        flex-direction: column;
+        gap: 15px;
+      }
     }
   </style>
 </head>
 <body>
   <div class="container">
-    <h1>🎯 베팅 영수증 테스트 데이터 분석 대시보드</h1>
+    <div class="header">
+      <h1>🎯 베팅 영수증 테스트 데이터 분석 대시보드</h1>
+      <button class="config-btn" onclick="openConfigModal()">⚙️ 추천 알고리즘</button>
+    </div>
 
     <div class="loading" id="loading">📊 실제 데이터를 불러오는 중...</div>
 
@@ -804,21 +1040,123 @@ export class RecommendationController {
     </div>
   </div>
 
+  <!-- 설정 모달 -->
+  <div id="configModal" class="modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title">⚙️ 추천 알고리즘 설정</h2>
+        <button class="close-btn" onclick="closeConfigModal()">&times;</button>
+      </div>
+
+      <form id="configForm" class="config-form">
+        <div class="total-weight" id="totalWeight">
+          총 가중치: <span id="totalWeightValue">0</span>
+        </div>
+
+        <h3 style="margin-top: 20px; color: #667eea;">🎯 가중치 설정</h3>
+        <div class="weight-group">
+          <div class="form-group">
+            <label for="league_weight">리그 선호도</label>
+            <input type="number" id="league_weight" name="league_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>자주 선택한 리그 가중치</small>
+          </div>
+
+          <div class="form-group">
+            <label for="compe_weight">종목 선호도</label>
+            <input type="number" id="compe_weight" name="compe_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>자주 선택한 종목 가중치</small>
+          </div>
+
+          <div class="form-group">
+            <label for="team_weight">팀 선호도</label>
+            <input type="number" id="team_weight" name="team_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>자주 선택한 팀 가중치</small>
+          </div>
+
+          <div class="form-group">
+            <label for="time_weight">시간대 선호도</label>
+            <input type="number" id="time_weight" name="time_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>선호 시간대 가중치</small>
+          </div>
+
+          <div class="form-group">
+            <label for="day_weight">요일 선호도</label>
+            <input type="number" id="day_weight" name="day_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>선호 요일 가중치</small>
+          </div>
+
+          <div class="form-group">
+            <label for="recency_weight">최근성 보너스</label>
+            <input type="number" id="recency_weight" name="recency_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>최근 활동 보너스</small>
+          </div>
+
+          <div class="form-group">
+            <label for="accuracy_weight">유저 정확도</label>
+            <input type="number" id="accuracy_weight" name="accuracy_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>유저 적중률 가중치</small>
+          </div>
+
+          <div class="form-group">
+            <label for="betting_type_consistency_weight">배팅 타입 일관성</label>
+            <input type="number" id="betting_type_consistency_weight" name="betting_type_consistency_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>일관된 배팅 스타일 가중치</small>
+          </div>
+
+          <div class="form-group">
+            <label for="odds_preference_weight">배당률 선호도</label>
+            <input type="number" id="odds_preference_weight" name="odds_preference_weight" min="0" max="100" step="1" oninput="calculateTotal()">
+            <small>선호 배당률 패턴 가중치</small>
+          </div>
+        </div>
+
+        <h3 style="margin-top: 20px; color: #667eea;">⚙️ 기타 설정</h3>
+        <div class="weight-group">
+          <div class="form-group">
+            <label for="min_recommendation_score">최소 추천 점수</label>
+            <input type="number" id="min_recommendation_score" name="min_recommendation_score" min="0" max="100" step="1">
+            <small>이 점수 이하는 추천하지 않음</small>
+          </div>
+
+          <div class="form-group">
+            <label for="max_recommendations">추천 경기 개수</label>
+            <input type="number" id="max_recommendations" name="max_recommendations" min="1" max="10" step="1">
+            <small>최대 추천할 경기 수</small>
+          </div>
+
+          <div class="form-group">
+            <label for="recency_days">최근성 기준 일수</label>
+            <input type="number" id="recency_days" name="recency_days" min="1" max="30" step="1">
+            <small>최근 활동 판단 기준</small>
+          </div>
+        </div>
+
+        <div class="button-group">
+          <button type="button" class="btn btn-secondary" onclick="closeConfigModal()">취소</button>
+          <button type="submit" class="btn btn-primary">저장</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 성공 토스트 -->
+  <div id="successToast" class="success-toast">
+    ✅ 알고리즘 설정이 성공적으로 업데이트되었습니다!
+  </div>
+
   <script>
-    // 실제 데이터 로드
+    let currentConfig = null;
+
+    // 페이지 로드 시 데이터 가져오기
     async function loadData() {
       try {
         const response = await fetch('/api/v1/recommendations/dashboard/data');
         const data = await response.json();
 
-        // 로딩 숨기고 콘텐츠 표시
         document.getElementById('loading').style.display = 'none';
         document.getElementById('content').style.display = 'block';
 
-        // 통계 카드 렌더링
         renderStats(data.stats);
-
-        // 차트 렌더링
         renderCharts(data);
       } catch (error) {
         console.error('데이터 로드 실패:', error);
@@ -837,11 +1175,11 @@ export class RecommendationController {
       ];
 
       statsGrid.innerHTML = statItems.map(item => 
-      '<div class="stat-card">' +
-        '<div class="stat-label">' + item.label + '</div>' +
-        '<div class="stat-value">' + item.value + '</div>' +
-      '</div>'
-    ).join('');
+        '<div class="stat-card">' +
+          '<div class="stat-label">' + item.label + '</div>' +
+          '<div class="stat-value">' + item.value + '</div>' +
+        '</div>'
+      ).join('');
     }
 
     function renderCharts(data) {
@@ -988,16 +1326,144 @@ export class RecommendationController {
       });
     }
 
+    // 모달 열기
+    async function openConfigModal() {
+      try {
+        const response = await fetch('/api/v1/recommendations/config');
+        const result = await response.json();
+        currentConfig = result.data;
+
+        // 폼에 현재 값 채우기
+        document.getElementById('league_weight').value = currentConfig.league_weight;
+        document.getElementById('compe_weight').value = currentConfig.compe_weight;
+        document.getElementById('team_weight').value = currentConfig.team_weight;
+        document.getElementById('time_weight').value = currentConfig.time_weight;
+        document.getElementById('day_weight').value = currentConfig.day_weight;
+        document.getElementById('recency_weight').value = currentConfig.recency_weight;
+        document.getElementById('accuracy_weight').value = currentConfig.accuracy_weight;
+        document.getElementById('betting_type_consistency_weight').value = currentConfig.betting_type_consistency_weight;
+        document.getElementById('odds_preference_weight').value = currentConfig.odds_preference_weight;
+        document.getElementById('min_recommendation_score').value = currentConfig.min_recommendation_score;
+        document.getElementById('max_recommendations').value = currentConfig.max_recommendations;
+        document.getElementById('recency_days').value = currentConfig.recency_days;
+
+        calculateTotal();
+        document.getElementById('configModal').style.display = 'block';
+      } catch (error) {
+        console.error('설정 로드 실패:', error);
+        alert('설정을 불러오는데 실패했습니다.');
+      }
+    }
+
+    // 모달 닫기
+    function closeConfigModal() {
+      document.getElementById('configModal').style.display = 'none';
+    }
+
+    // 총 가중치 계산
+    function calculateTotal() {
+      const weights = [
+        'league_weight',
+        'compe_weight',
+        'team_weight',
+        'time_weight',
+        'day_weight',
+        'recency_weight',
+        'accuracy_weight',
+        'betting_type_consistency_weight',
+        'odds_preference_weight'
+      ];
+
+      let total = 0;
+      weights.forEach(weight => {
+        const value = parseInt(document.getElementById(weight).value) || 0;
+        total += value;
+      });
+
+      const totalWeightDiv = document.getElementById('totalWeight');
+      const totalWeightValue = document.getElementById('totalWeightValue');
+      
+      totalWeightValue.textContent = total;
+
+      // 경고 표시
+      if (total > 200) {
+        totalWeightDiv.classList.add('warning');
+        totalWeightDiv.innerHTML = '⚠️ 총 가중치: <span id="totalWeightValue">' + total + '</span> (권장: 150 이하)';
+      } else {
+        totalWeightDiv.classList.remove('warning');
+        totalWeightDiv.innerHTML = '총 가중치: <span id="totalWeightValue">' + total + '</span>';
+      }
+    }
+
+    // 폼 제출
+    document.getElementById('configForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      const formData = {
+        league_weight: parseInt(document.getElementById('league_weight').value),
+        compe_weight: parseInt(document.getElementById('compe_weight').value),
+        team_weight: parseInt(document.getElementById('team_weight').value),
+        time_weight: parseInt(document.getElementById('time_weight').value),
+        day_weight: parseInt(document.getElementById('day_weight').value),
+        recency_weight: parseInt(document.getElementById('recency_weight').value),
+        accuracy_weight: parseInt(document.getElementById('accuracy_weight').value),
+        betting_type_consistency_weight: parseInt(document.getElementById('betting_type_consistency_weight').value),
+        odds_preference_weight: parseInt(document.getElementById('odds_preference_weight').value),
+        min_recommendation_score: parseInt(document.getElementById('min_recommendation_score').value),
+        max_recommendations: parseInt(document.getElementById('max_recommendations').value),
+        recency_days: parseInt(document.getElementById('recency_days').value),
+      };
+
+      try {
+        const response = await fetch('/api/v1/recommendations/config', {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(formData),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          closeConfigModal();
+          showSuccessToast();
+        } else {
+          alert('설정 업데이트에 실패했습니다.');
+        }
+      } catch (error) {
+        console.error('설정 업데이트 실패:', error);
+        alert('설정 업데이트에 실패했습니다.');
+      }
+    });
+
+    // 성공 토스트 표시
+    function showSuccessToast() {
+      const toast = document.getElementById('successToast');
+      toast.style.display = 'block';
+      setTimeout(() => {
+        toast.style.display = 'none';
+      }, 3000);
+    }
+
+    // 모달 외부 클릭시 닫기
+    window.onclick = function(event) {
+      const modal = document.getElementById('configModal');
+      if (event.target === modal) {
+        closeConfigModal();
+      }
+    }
+
     // 페이지 로드 시 데이터 가져오기
     loadData();
   </script>
 </body>
 </html>
-    `;
+  `;
 
-    res.setHeader('Content-Type', 'text/html');
-    res.send(html);
-  }
+  res.setHeader('Content-Type', 'text/html');
+  res.send(html);
+}
 
   // ==================== 대시보드용 데이터 API ====================
   @Get('dashboard/data')
@@ -1010,4 +1476,56 @@ export class RecommendationController {
     const stats = await this.recommendationService.getDashboardStats();
     return stats;
   }
+
+
+  // ==================== 알고리즘 설정 조회 ====================
+  @Get('config')
+  @ApiOperation({
+    summary: '⚙️ 추천 알고리즘 설정 조회',
+    description: '현재 활성화된 추천 알고리즘 설정을 조회합니다.',
+  })
+  async getConfig() {
+    const config = await this.recommendationService.getConfig();
+    return {
+      success: true,
+      data: config,
+      message: '알고리즘 설정이 조회되었습니다.',
+    };
+  }
+
+  // ==================== 알고리즘 설정 업데이트 ====================
+  @Put('config')
+  @ApiOperation({
+    summary: '⚙️ 추천 알고리즘 설정 업데이트',
+    description: '추천 알고리즘의 가중치 및 설정을 업데이트합니다.',
+  })
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        league_weight: { type: 'number', example: 30, description: '리그 선호도 가중치' },
+        compe_weight: { type: 'number', example: 25, description: '종목 선호도 가중치' },
+        team_weight: { type: 'number', example: 25, description: '팀 선호도 가중치' },
+        time_weight: { type: 'number', example: 10, description: '시간대 선호도 가중치' },
+        day_weight: { type: 'number', example: 10, description: '요일 선호도 가중치' },
+        recency_weight: { type: 'number', example: 10, description: '최근성 보너스 가중치' },
+        accuracy_weight: { type: 'number', example: 20, description: '유저 정확도 가중치' },
+        betting_type_consistency_weight: { type: 'number', example: 15, description: '배팅 타입 일관성 가중치' },
+        odds_preference_weight: { type: 'number', example: 10, description: '배당률 선호도 가중치' },
+        min_recommendation_score: { type: 'number', example: 20, description: '최소 추천 점수' },
+        max_recommendations: { type: 'number', example: 5, description: '추천 경기 개수' },
+        recency_days: { type: 'number', example: 7, description: '최근성 판단 기준 일수' },
+      },
+    },
+  })
+  async updateConfig(@Body() updateData: any) {
+    const config = await this.recommendationService.updateConfig(updateData);
+    return {
+      success: true,
+      data: config,
+      message: '알고리즘 설정이 업데이트되었습니다.',
+    };
+  }
+
+
 }
