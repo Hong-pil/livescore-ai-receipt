@@ -6,6 +6,7 @@ import { RecommendationController } from './controllers/recommendation.controlle
 import { BettingReceiptService } from './services/betting-receipt.service';
 import { RecommendationService } from './services/recommendation.service';
 import { BettingReceipt, BettingReceiptSchema } from './schemas/betting-receipt.schema';
+import { TestDataGenerator } from '../../scripts/generate-test-data';
 
 @Module({
   imports: [
@@ -22,11 +23,13 @@ import { BettingReceipt, BettingReceiptSchema } from './schemas/betting-receipt.
     
   providers: [
     BettingReceiptService,
-    RecommendationService
+    RecommendationService,
+    TestDataGenerator,
   ],       // 비즈니스 로직 처리
   exports: [
     BettingReceiptService,
-    RecommendationService
+    RecommendationService,
+    TestDataGenerator,
   ],
 })
 export class BettingReceiptModule {}

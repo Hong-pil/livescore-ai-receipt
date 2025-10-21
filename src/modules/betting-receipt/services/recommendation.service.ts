@@ -514,4 +514,100 @@ export class RecommendationService {
       compe_combinations: Object.fromEntries(pattern.compe_combinations),
     };
   }
+
+
+  // ==================== 대시보드용 통계 데이터 ====================
+  async getDashboardStats() {
+    const receipts = await this.bettingReceiptModel.find({}).exec();
+
+    // 페르소나별 집계
+    const byPersona: Record<string, number> = {};
+    const byCompe: Record<string, number> = {};
+    const byTime: Record<string, number> = {};
+    const byBettingType: Record<string, number> = {};
+    const byMonth: Record<string, number> = {};
+    const successRateByPersona: Record<string, number[]> = {};
+
+    let totalBettingAmount = 0;
+    let totalWon = 0;
+
+    receipts.forEach(receipt => {
+      // 페르소나 분류 (user_no 기반)
+      const personaType = this.classifyPersona(receipt.user_no);
+      byPersona[personaType] = (byPersona[personaType] || 0) + 1;
+
+      // 성공률 집계
+      if (!successRateByPersona[personaType]) {
+        successRateByPersona[personaType] = [];
+      }
+      successRateByPersona[personaType].push(receipt.status === 'won' ? 1 : 0);
+
+      // 종목별
+      receipt.selected_games.forEach((game: any) => {
+        byCompe[game.compe] = (byCompe[game.compe] || 0) + 1;
+        
+        // 시간대별
+        byTime[game.match_time] = (byTime[game.match_time] || 0) + 1;
+      });
+
+      // 배팅 타입별
+      receipt.betting_items.forEach((item: any) => {
+        const typeLabel = this.getBettingTypeLabel(item.betting_type);
+        byBettingType[typeLabel] = (byBettingType[typeLabel] || 0) + 1;
+      });
+
+      // 월별
+      const month = new Date(receipt.createdAt).toLocaleDateString('ko-KR', { month: 'long' });
+      byMonth[month] = (byMonth[month] || 0) + 1;
+
+      // 총액
+      totalBettingAmount += receipt.total_betting_amount;
+      if (receipt.status === 'won') totalWon++;
+    });
+
+    // 적중률 계산
+    const successRateByPersonaAvg: Record<string, number> = {};
+    Object.keys(successRateByPersona).forEach(persona => {
+      const rates = successRateByPersona[persona];
+      const avg = (rates.reduce((a, b) => a + b, 0) / rates.length) * 100;
+      successRateByPersonaAvg[persona] = Math.round(avg * 10) / 10;
+    });
+
+    return {
+      stats: {
+        total_receipts: receipts.length,
+        personas: 50,
+        avg_success_rate: Math.round((totalWon / receipts.length) * 1000) / 10,
+        total_betting_amount: totalBettingAmount,
+      },
+      by_persona: byPersona,
+      by_compe: byCompe,
+      by_time: byTime,
+      by_betting_type: byBettingType,
+      by_month: byMonth,
+      success_rate_by_persona: successRateByPersonaAvg,
+    };
+  }
+
+  private classifyPersona(userNo: string): string {
+    if (userNo.includes('BASEBALL')) return '야구광';
+    if (userNo.includes('BASKETBALL')) return '농구팬';
+    if (userNo.includes('SOCCER')) return '축구팬';
+    if (userNo.includes('ALL_ROUNDER')) return '올라운더';
+    if (userNo.includes('LIGHT')) return '라이트유저';
+    return '기타';
+  }
+
+  private getBettingTypeLabel(type: string): string {
+    const labels: Record<string, string> = {
+      'home': '홈승',
+      'away': '원정승',
+      'draw': '무승부',
+      'handicap_home': '핸디캡(홈)',
+      'handicap_away': '핸디캡(원정)',
+      'over': '오버',
+      'under': '언더',
+    };
+    return labels[type] || type;
+  }
 }

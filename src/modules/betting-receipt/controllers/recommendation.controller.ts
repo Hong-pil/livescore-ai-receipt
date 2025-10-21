@@ -6,7 +6,9 @@ import {
   Body,
   Param,
   Query,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import {
   ApiTags,
   ApiOperation,
@@ -36,7 +38,7 @@ export class RecommendationController {
 
 **추천 알고리즘:**
 - 리그 선호도 (30점)
-- 종목 선호도 (25점)  
+- 종목 선호도 (25점)
 - 팀 선호도 (25점)
 - 시간대 선호도 (10점)
 - 요일 선호도 (10점)
@@ -520,5 +522,492 @@ export class RecommendationController {
       data: result,
       message: `${result.total_receipts}개의 테스트 영수증이 생성되었습니다.`
     };
+  }
+
+  // ==================== 시각화 대시보드 ====================
+  @Get('dashboard')
+  @ApiOperation({
+    summary: '📊 테스트 데이터 시각화 대시보드',
+    description: '생성된 테스트 데이터를 시각적으로 분석하는 대시보드를 제공합니다.'
+  })
+  async getDashboard(@Res() res: Response) {
+    const html = `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>베팅 영수증 테스트 데이터 분석</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      padding: 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      color: white;
+      text-align: center;
+      margin-bottom: 30px;
+      font-size: 2.5em;
+      text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+    }
+
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .stat-card {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      text-align: center;
+      transition: transform 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-5px);
+    }
+
+    .stat-value {
+      font-size: 2.5em;
+      font-weight: bold;
+      color: #667eea;
+      margin: 10px 0;
+    }
+
+    .stat-label {
+      color: #666;
+      font-size: 0.9em;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .loading {
+      color: white;
+      text-align: center;
+      font-size: 1.5em;
+      margin-top: 50px;
+    }
+
+    .charts-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(500px, 1fr));
+      gap: 20px;
+      margin-bottom: 30px;
+    }
+
+    .chart-card {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    }
+
+    .chart-title {
+      font-size: 1.3em;
+      font-weight: bold;
+      color: #333;
+      margin-bottom: 20px;
+      text-align: center;
+    }
+
+    .table-card {
+      background: white;
+      border-radius: 15px;
+      padding: 25px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+      margin-bottom: 30px;
+      overflow-x: auto;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    th {
+      background: #667eea;
+      color: white;
+      padding: 15px;
+      text-align: left;
+      font-weight: 600;
+    }
+
+    td {
+      padding: 12px 15px;
+      border-bottom: 1px solid #eee;
+    }
+
+    tr:hover {
+      background: #f8f9fa;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.85em;
+      font-weight: 600;
+    }
+
+    .badge-success {
+      background: #d4edda;
+      color: #155724;
+    }
+
+    .badge-info {
+      background: #d1ecf1;
+      color: #0c5460;
+    }
+
+    .badge-warning {
+      background: #fff3cd;
+      color: #856404;
+    }
+
+    @media (max-width: 768px) {
+      .charts-grid {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎯 베팅 영수증 테스트 데이터 분석 대시보드</h1>
+
+    <div class="loading" id="loading">📊 실제 데이터를 불러오는 중...</div>
+
+    <div id="content" style="display: none;">
+      <!-- 통계 카드 -->
+      <div class="stats-grid" id="statsGrid"></div>
+
+      <!-- 차트 그리드 -->
+      <div class="charts-grid">
+        <div class="chart-card">
+          <div class="chart-title">📊 페르소나별 영수증 생성 수</div>
+          <canvas id="personaChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">⚽ 종목별 경기 분포</div>
+          <canvas id="compeChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">⏰ 시간대별 배팅 빈도</div>
+          <canvas id="timeChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">🎲 배팅 타입별 분포</div>
+          <canvas id="bettingTypeChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">📈 월별 영수증 생성 추이</div>
+          <canvas id="monthlyChart"></canvas>
+        </div>
+
+        <div class="chart-card">
+          <div class="chart-title">🎯 페르소나별 적중률</div>
+          <canvas id="successRateChart"></canvas>
+        </div>
+      </div>
+
+      <!-- 페르소나 테이블 -->
+      <div class="table-card">
+        <div class="chart-title">👥 페르소나 상세 정보</div>
+        <table>
+          <thead>
+            <tr>
+              <th>페르소나</th>
+              <th>유저 수</th>
+              <th>선호 종목</th>
+              <th>배팅 스타일</th>
+              <th>활동 레벨</th>
+              <th>평균 적중률</th>
+              <th>평균 배팅액</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>야구광</strong></td>
+              <td>10명</td>
+              <td><span class="badge badge-info">야구</span></td>
+              <td>핸디캡/일반</td>
+              <td><span class="badge badge-warning">높음</span></td>
+              <td>45-60%</td>
+              <td>3,000-15,000원</td>
+            </tr>
+            <tr>
+              <td><strong>농구팬</strong></td>
+              <td>10명</td>
+              <td><span class="badge badge-info">농구</span></td>
+              <td>언오버/핸디캡</td>
+              <td><span class="badge badge-warning">높음</span></td>
+              <td>40-55%</td>
+              <td>5,000-20,000원</td>
+            </tr>
+            <tr>
+              <td><strong>축구팬</strong></td>
+              <td>10명</td>
+              <td><span class="badge badge-info">축구</span></td>
+              <td>무승부/일반</td>
+              <td><span class="badge badge-success">중간</span></td>
+              <td>42-54%</td>
+              <td>10,000-30,000원</td>
+            </tr>
+            <tr>
+              <td><strong>올라운더</strong></td>
+              <td>10명</td>
+              <td><span class="badge badge-info">복합</span></td>
+              <td>조합 배팅</td>
+              <td><span class="badge badge-success">중간</span></td>
+              <td>38-50%</td>
+              <td>1,000-10,000원</td>
+            </tr>
+            <tr>
+              <td><strong>라이트 유저</strong></td>
+              <td>10명</td>
+              <td><span class="badge badge-info">다양</span></td>
+              <td>일반</td>
+              <td><span class="badge badge-info">낮음</span></td>
+              <td>35-50%</td>
+              <td>1,000-5,000원</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // 실제 데이터 로드
+    async function loadData() {
+      try {
+        const response = await fetch('/api/v1/recommendations/dashboard/data');
+        const data = await response.json();
+
+        // 로딩 숨기고 콘텐츠 표시
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('content').style.display = 'block';
+
+        // 통계 카드 렌더링
+        renderStats(data.stats);
+
+        // 차트 렌더링
+        renderCharts(data);
+      } catch (error) {
+        console.error('데이터 로드 실패:', error);
+        document.getElementById('loading').innerHTML = '❌ 데이터 로드에 실패했습니다.';
+      }
+    }
+
+    function renderStats(stats) {
+      const statsGrid = document.getElementById('statsGrid');
+      const statItems = [
+        { label: '총 영수증', value: stats.total_receipts.toLocaleString() },
+        { label: '페르소나 수', value: stats.personas },
+        { label: '데이터 기간', value: '6개월' },
+        { label: '평균 적중률', value: stats.avg_success_rate + '%' },
+        { label: '총 배팅액', value: (stats.total_betting_amount / 10000).toFixed(0) + '만원' }
+      ];
+
+      statsGrid.innerHTML = statItems.map(item => 
+      '<div class="stat-card">' +
+        '<div class="stat-label">' + item.label + '</div>' +
+        '<div class="stat-value">' + item.value + '</div>' +
+      '</div>'
+    ).join('');
+    }
+
+    function renderCharts(data) {
+      const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: true,
+        plugins: {
+          legend: {
+            position: 'bottom',
+            labels: { padding: 15, font: { size: 12 } }
+          }
+        }
+      };
+
+      // 1. 페르소나별 차트
+      new Chart(document.getElementById('personaChart'), {
+        type: 'bar',
+        data: {
+          labels: Object.keys(data.by_persona),
+          datasets: [{
+            label: '영수증 수',
+            data: Object.values(data.by_persona),
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.7)',
+              'rgba(54, 162, 235, 0.7)',
+              'rgba(255, 206, 86, 0.7)',
+              'rgba(75, 192, 192, 0.7)',
+              'rgba(153, 102, 255, 0.7)'
+            ],
+            borderWidth: 2
+          }]
+        },
+        options: {
+          ...commonOptions,
+          scales: {
+            y: { beginAtZero: true }
+          }
+        }
+      });
+
+      // 2. 종목별 차트
+      new Chart(document.getElementById('compeChart'), {
+        type: 'doughnut',
+        data: {
+          labels: Object.keys(data.by_compe),
+          datasets: [{
+            data: Object.values(data.by_compe),
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.8)',
+              'rgba(54, 162, 235, 0.8)',
+              'rgba(255, 206, 86, 0.8)'
+            ],
+            borderWidth: 3,
+            borderColor: '#fff'
+          }]
+        },
+        options: {
+          ...commonOptions,
+          cutout: '60%'
+        }
+      });
+
+      // 3. 시간대별 차트
+      new Chart(document.getElementById('timeChart'), {
+        type: 'line',
+        data: {
+          labels: Object.keys(data.by_time || {}),
+          datasets: [{
+            label: '배팅 빈도',
+            data: Object.values(data.by_time || {}),
+            borderColor: 'rgba(102, 126, 234, 1)',
+            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+            tension: 0.4,
+            fill: true,
+            borderWidth: 3
+          }]
+        },
+        options: commonOptions
+      });
+
+      // 4. 배팅 타입별 차트
+      new Chart(document.getElementById('bettingTypeChart'), {
+        type: 'pie',
+        data: {
+          labels: Object.keys(data.by_betting_type || {}),
+          datasets: [{
+            data: Object.values(data.by_betting_type || {}),
+            backgroundColor: [
+              'rgba(255, 99, 132, 0.8)',
+              'rgba(54, 162, 235, 0.8)',
+              'rgba(255, 206, 86, 0.8)',
+              'rgba(75, 192, 192, 0.8)',
+              'rgba(153, 102, 255, 0.8)',
+              'rgba(255, 159, 64, 0.8)',
+              'rgba(201, 203, 207, 0.8)'
+            ],
+            borderWidth: 2,
+            borderColor: '#fff'
+          }]
+        },
+        options: commonOptions
+      });
+
+      // 5. 월별 차트
+      new Chart(document.getElementById('monthlyChart'), {
+        type: 'bar',
+        data: {
+          labels: Object.keys(data.by_month || {}),
+          datasets: [{
+            label: '생성된 영수증',
+            data: Object.values(data.by_month || {}),
+            backgroundColor: 'rgba(102, 126, 234, 0.7)',
+            borderColor: 'rgba(102, 126, 234, 1)',
+            borderWidth: 2
+          }]
+        },
+        options: commonOptions
+      });
+
+      // 6. 적중률 차트
+      new Chart(document.getElementById('successRateChart'), {
+        type: 'radar',
+        data: {
+          labels: Object.keys(data.success_rate_by_persona || {}),
+          datasets: [{
+            label: '평균 적중률 (%)',
+            data: Object.values(data.success_rate_by_persona || {}),
+            backgroundColor: 'rgba(102, 126, 234, 0.2)',
+            borderColor: 'rgba(102, 126, 234, 1)',
+            borderWidth: 3,
+            pointRadius: 5
+          }]
+        },
+        options: {
+          ...commonOptions,
+          scales: {
+            r: {
+              beginAtZero: true,
+              max: 100,
+              ticks: { stepSize: 20 }
+            }
+          }
+        }
+      });
+    }
+
+    // 페이지 로드 시 데이터 가져오기
+    loadData();
+  </script>
+</body>
+</html>
+    `;
+
+    res.setHeader('Content-Type', 'text/html');
+    res.send(html);
+  }
+
+  // ==================== 대시보드용 데이터 API ====================
+  @Get('dashboard/data')
+  @ApiOperation({
+    summary: '📊 대시보드용 통계 데이터',
+    description: '대시보드에 표시할 실제 통계 데이터를 제공합니다.'
+  })
+  async getDashboardData() {
+    // 실제 DB에서 통계 데이터 조회
+    const stats = await this.recommendationService.getDashboardStats();
+    return stats;
   }
 }
