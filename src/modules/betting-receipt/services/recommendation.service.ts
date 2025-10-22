@@ -4,6 +4,7 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { BettingReceipt, BettingReceiptDocument } from '../schemas/betting-receipt.schema';
 import { RecommendationConfig, RecommendationConfigDocument } from '../schemas/recommendation-config.schema';
+import { GameDto } from '../dtos/create-betting-receipt.dto';
 
 // ==================== 추천 결과 인터페이스 ====================
 interface RecommendedGame {
@@ -22,11 +23,14 @@ interface RecommendedGame {
   frequency: number; // 과거 선택 빈도
   recent_selection_count: number; // 최근 선택 횟수
   success_rate?: number; // 적중률 (나중에 구현)
+  // ⭐ GameDto의 모든 필드 추가
+  [key: string]: any; // GameDto의 나머지 필드들을 포함하기 위한 인덱스 시그니처
 }
 
 export interface RecommendationResult {
   user_no: string;
-  recommended_games: RecommendedGame[];
+  //recommended_games: RecommendedGame[];
+  recommended_games: any[]; // ⭐ GameDto[] 타입으로 변경
   analysis: {
     total_receipts: number;
     favorite_league: string;
@@ -151,7 +155,7 @@ export class RecommendationService {
   // ==================== 메인: 경기 추천 ====================
   async getRecommendations(
   userNo: string,
-  availableGames: any[],
+  availableGames: GameDto[],
 ): Promise<RecommendationResult> {
   this.logger.log(`유저 ${userNo}에 대한 추천 생성 시작`);
 
@@ -540,18 +544,19 @@ export class RecommendationService {
    * 
    */
   private scoreGames(
-    availableGames: any[],
+    availableGames: GameDto[],
     pattern: UserPattern,
     receipts: BettingReceiptDocument[],
     userAccuracy: number,
     config: RecommendationConfig,
-  ): RecommendedGame[] {
+  //): RecommendedGame[] {
+  ): any[] { // ⭐ RecommendedGame[] 대신 any[] 사용
     return availableGames.map((game) => {
       let score = 0;
       const reasons: string[] = [];
 
-      // 1. 리그 선호도 점수
-      const leagueData = pattern.leagues.get(game.league_name);
+      // 1. 리그 선호도 점수 - Optional chaining 추가
+      const leagueData = pattern.leagues.get(game.league_name || '');
       if (leagueData) {
         const leagueScore = Math.min(
           config.league_weight,
@@ -565,7 +570,7 @@ export class RecommendationService {
       }
 
       // 2. 종목 선호도 점수
-      const compeData = pattern.compes.get(game.compe);
+      const compeData = pattern.compes.get(game.compe || '');
       if (compeData) {
         const compeScore = Math.min(
           config.compe_weight,
@@ -578,8 +583,8 @@ export class RecommendationService {
       }
 
       // 3. 팀 선호도 점수
-      const homeTeamData = pattern.teams.get(game.home_team_name);
-      const awayTeamData = pattern.teams.get(game.away_team_name);
+      const homeTeamData = pattern.teams.get(game.home_team_name || '');
+      const awayTeamData = pattern.teams.get(game.away_team_name || '');
       
       if (homeTeamData) {
         score += Math.min(config.team_weight * 0.6, homeTeamData.count * 3 + homeTeamData.recent_count * 2);
@@ -596,7 +601,7 @@ export class RecommendationService {
       }
 
       // 4. 시간대 선호도 점수
-      const timeCount = pattern.time_preferences.get(game.match_time) || 0;
+      const timeCount = pattern.time_preferences.get(game.match_time || '') || 0;
       if (timeCount > 0) {
         score += Math.min(config.time_weight, timeCount * 2);
         if (timeCount > 3) {
@@ -605,7 +610,7 @@ export class RecommendationService {
       }
 
       // 5. 요일 선호도 점수
-      const dayOfWeek = new Date(game.match_date).toLocaleDateString('ko-KR', {
+      const dayOfWeek = new Date(game.match_date || new Date()).toLocaleDateString('ko-KR', {
         weekday: 'short',
       });
       const dayCount = pattern.day_preferences.get(dayOfWeek) || 0;
@@ -619,7 +624,7 @@ export class RecommendationService {
       const recentSameLeague = receipts.some(
         (r) =>
           r.createdAt >= recentDate &&
-          r.selected_games.some((g: any) => g.league_name === game.league_name),
+          r.selected_games.some((g: any) => g.league_name === (game.league_name || '')),
       );
       if (recentSameLeague) {
         score += config.recency_weight;
@@ -659,16 +664,18 @@ export class RecommendationService {
         (homeTeamData?.recent_count || 0) +
         (awayTeamData?.recent_count || 0);
 
+      // ⭐ 기존 game 객체를 그대로 반환하되, 추가 필드만 추가
       return {
-        game_id: game.game_id,
-        game_no: game.game_no,
-        league_name: game.league_name,
-        league_id: game.league_id,
-        compe: game.compe,
-        home_team_name: game.home_team_name,
-        away_team_name: game.away_team_name,
-        match_date: game.match_date,
-        match_time: game.match_time,
+        ...game, // ⭐ GameDto의 모든 필드 유지
+        // game_id: game.game_id || '',
+        // game_no: game.game_no || '',
+        // league_name: game.league_name || '',
+        // league_id: game.league_id || '',
+        // compe: game.compe || '',
+        // home_team_name: game.home_team_name || '',
+        // away_team_name: game.away_team_name || '',
+        // match_date: game.match_date || '',
+        // match_time: game.match_time || '',
         recommended_betting_type: recommendedBettingType,
         confidence_score: Math.min(100, Math.round(score)),
         reason: reasons.join(', ') || '새로운 경기',
@@ -691,7 +698,7 @@ export class RecommendationService {
 
   // ==================== 추천 배팅 타입 결정 ====================
   private determineRecommendedBettingType(
-    game: any,
+    game: GameDto,
     pattern: UserPattern,
   ): string {
     // 유저가 가장 자주 사용하는 배팅 타입 찾기
@@ -794,21 +801,23 @@ export class RecommendationService {
   // ==================== 신규 유저 기본 추천 ====================
   private getDefaultRecommendations(
     userNo: string,
-    availableGames: any[],
+    availableGames: GameDto[],
     config: RecommendationConfig,
   ): RecommendationResult {
+    //const randomGames: RecommendedGame[] = availableGames
     const randomGames = availableGames
       .slice(0, config.max_recommendations)
       .map((game) => ({
-        game_id: game.game_id,
-        game_no: game.game_no,
-        league_name: game.league_name,
-        league_id: game.league_id,
-        compe: game.compe,
-        home_team_name: game.home_team_name,
-        away_team_name: game.away_team_name,
-        match_date: game.match_date,
-        match_time: game.match_time,
+        ...game, // ⭐ GameDto의 모든 필드 유지
+        // game_id: game.game_id || '',
+        // game_no: game.game_no || '',
+        // league_name: game.league_name || '',
+        // league_id: game.league_id || '',
+        // compe: game.compe || '',
+        // home_team_name: game.home_team_name || '',
+        // away_team_name: game.away_team_name || '',
+        // match_date: game.match_date || '',
+        // match_time: game.match_time || '',
         recommended_betting_type: 'home',
         confidence_score: 50,
         reason: '인기 경기',

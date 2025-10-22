@@ -19,7 +19,8 @@ import {
 } from '@nestjs/swagger';
 import { RecommendationService } from '../services/recommendation.service';
 import { RecommendationResult } from '../services/recommendation.service';
-import { TestDataGenerator } from '../../../scripts/generate-test-data'
+import { TestDataGenerator } from '../../../scripts/generate-test-data';
+import { GameDto } from '../dtos/create-betting-receipt.dto';
 
 @ApiTags('🎯 경기 추천 시스템')
 @Controller('api/v1/recommendations')
@@ -61,23 +62,7 @@ export class RecommendationController {
         available_games: {
           type: 'array',
           description: '현재 배팅 가능한 경기 목록 (앱에서 전달)',
-          items: {
-            type: 'object',
-            properties: {
-              game_id: { type: 'string', example: 'OT20251412931896' },
-              game_no: { type: 'string', example: '042' },
-              league_name: { type: 'string', example: 'NPB' },
-              league_id: { type: 'string', example: 'OT141' },
-              compe: { type: 'string', example: 'baseball' },
-              home_team_name: { type: 'string', example: '한신' },
-              away_team_name: { type: 'string', example: '요코하마' },
-              match_date: { type: 'string', example: '2025-10-16' },
-              match_time: { type: 'string', example: '18:00' },
-              handicap_score_cn: { type: 'string', example: '-2.5' },
-              home_bet_rt: { type: 'string', example: '2.81' },
-              away_bet_rt: { type: 'string', example: '1.26' },
-            },
-          },
+          items: { $ref: '#/components/schemas/GameDto' },  // 변경된 부분
         },
       },
     },
@@ -190,7 +175,7 @@ export class RecommendationController {
   })
   @ApiResponse({ status: 400, description: '잘못된 요청 데이터입니다.' })
   async getRecommendations(
-    @Body() body: { user_no: string; available_games: any[] },
+    @Body() body: { user_no: string; available_games: GameDto[] },
   ): Promise<{
     success: boolean;
     data: RecommendationResult | null;
@@ -455,7 +440,7 @@ async getAlgorithmInfo() {
         handicap_score_cn: '-2.5',
         home_bet_rt: '2.81',
         away_bet_rt: '1.26',
-      },
+      } as GameDto,
       {
         game_id: 'TEST_002',
         game_no: '002',
@@ -469,7 +454,7 @@ async getAlgorithmInfo() {
         handicap_score_cn: '0.0',
         home_bet_rt: '2.50',
         away_bet_rt: '2.55',
-      },
+      } as GameDto,
       {
         game_id: 'TEST_003',
         game_no: '003',
@@ -483,7 +468,7 @@ async getAlgorithmInfo() {
         handicap_score_cn: '-3.5',
         home_bet_rt: '1.68',
         away_bet_rt: '1.80',
-      },
+      } as GameDto,
       {
         game_id: 'TEST_004',
         game_no: '004',
@@ -497,7 +482,7 @@ async getAlgorithmInfo() {
         handicap_score_cn: '-1.5',
         home_bet_rt: '2.10',
         away_bet_rt: '1.65',
-      },
+      } as GameDto,
       {
         game_id: 'TEST_005',
         game_no: '005',
@@ -511,7 +496,7 @@ async getAlgorithmInfo() {
         handicap_score_cn: '0.0',
         home_bet_rt: '2.30',
         away_bet_rt: '2.80',
-      },
+      } as GameDto,
     ];
 
     const result = await this.recommendationService.getRecommendations(
