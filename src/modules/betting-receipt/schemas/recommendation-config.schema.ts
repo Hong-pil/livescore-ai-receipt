@@ -9,6 +9,7 @@ export type RecommendationConfigDocument = HydratedDocument<RecommendationConfig
   timestamps: true,
   collection: 'recommendation_configs'
 })
+
 export class RecommendationConfig {
   @ApiProperty({ example: 30, description: '리그 선호도 가중치 (0-100)' })
   @Prop({ type: Number, required: true, default: 30, min: 0, max: 100 })
