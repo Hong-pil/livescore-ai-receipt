@@ -825,7 +825,7 @@ export class RecommendationService {
         recent_selection_count: 0,
       }));
 
-      console.log("idpil::: return : " + {
+      console.log("idpil::: return : " + JSON.stringify({
       user_no: userNo,
       recommended_games: randomGames,
       analysis: {
@@ -838,7 +838,7 @@ export class RecommendationService {
         user_accuracy: 0,
       },
       generated_at: new Date(),
-    });
+    }));
 
     return {
       user_no: userNo,
