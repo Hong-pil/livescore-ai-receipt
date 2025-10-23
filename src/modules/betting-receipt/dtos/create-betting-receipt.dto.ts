@@ -1507,6 +1507,42 @@ export class GameDto {
   @IsOptional()
   @IsBoolean()
   displayMatchDate?: boolean;
+
+
+
+
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  recommended_betting_type?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsNumber()
+  confidence_score?: number;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsNumber()
+  frequency?: number;
+
+  @ApiProperty({ example: '', description: 'api 문서보고 정리할 것', required: false })
+  @IsOptional()
+  @IsNumber()
+  recent_selection_count?: number;
+
+
+
+
+
+
+
 }
 
 // ==================== 메인 생성 DTO ====================
