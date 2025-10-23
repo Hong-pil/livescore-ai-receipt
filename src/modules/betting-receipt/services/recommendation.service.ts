@@ -825,6 +825,21 @@ export class RecommendationService {
         recent_selection_count: 0,
       }));
 
+      console.log("idpil::: return : " + {
+      user_no: userNo,
+      recommended_games: randomGames,
+      analysis: {
+        total_receipts: 0,
+        favorite_league: '-',
+        favorite_compe: '-',
+        favorite_betting_type: '-',
+        most_selected_team: '-',
+        recent_activity_days: 0,
+        user_accuracy: 0,
+      },
+      generated_at: new Date(),
+    });
+
     return {
       user_no: userNo,
       recommended_games: randomGames,
