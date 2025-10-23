@@ -30,7 +30,7 @@ interface RecommendedGame {
 export interface RecommendationResult {
   user_no: string;
   //recommended_games: RecommendedGame[];
-  recommended_games: any[]; // ⭐ GameDto[] 타입으로 변경
+  recommended_games: GameDto[]; // ⭐ GameDto[] 타입으로 변경
   analysis: {
     total_receipts: number;
     favorite_league: string;
