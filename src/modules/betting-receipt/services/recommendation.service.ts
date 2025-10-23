@@ -29,8 +29,8 @@ interface RecommendedGame {
 
 export interface RecommendationResult {
   user_no: string;
-  //recommended_games: RecommendedGame[];
-  recommended_games: GameDto[]; // ⭐ GameDto[] 타입으로 변경
+  recommended_games: RecommendedGame[];
+  // recommended_games: GameDto[]; // ⭐ GameDto[] 타입으로 변경
   analysis: {
     total_receipts: number;
     favorite_league: string;
@@ -666,16 +666,21 @@ export class RecommendationService {
 
       // ⭐ 기존 game 객체를 그대로 반환하되, 추가 필드만 추가
       return {
-        ...game, // ⭐ GameDto의 모든 필드 유지
-        // game_id: game.game_id || '',
-        // game_no: game.game_no || '',
-        // league_name: game.league_name || '',
-        // league_id: game.league_id || '',
-        // compe: game.compe || '',
-        // home_team_name: game.home_team_name || '',
-        // away_team_name: game.away_team_name || '',
-        // match_date: game.match_date || '',
-        // match_time: game.match_time || '',
+        // ...game, // ⭐ GameDto의 모든 필드 유지
+        
+        
+
+        game_id: game.game_id || '',
+        game_no: game.game_no || '',
+        league_name: game.league_name || '',
+        league_id: game.league_id || '',
+        compe: game.compe || '',
+        home_team_name: game.home_team_name || '',
+        away_team_name: game.away_team_name || '',
+        match_date: game.match_date || '',
+        match_time: game.match_time || '',
+
+
         recommended_betting_type: recommendedBettingType,
         confidence_score: Math.min(100, Math.round(score)),
         reason: reasons.join(', ') || '새로운 경기',
@@ -804,20 +809,28 @@ export class RecommendationService {
     availableGames: GameDto[],
     config: RecommendationConfig,
   ): RecommendationResult {
-    //const randomGames: RecommendedGame[] = availableGames
-    const randomGames = availableGames
+    const randomGames: RecommendedGame[] = availableGames
+    // const randomGames = availableGames
       .slice(0, config.max_recommendations)
       .map((game) => ({
-        ...game, // ⭐ GameDto의 모든 필드 유지
-        // game_id: game.game_id || '',
-        // game_no: game.game_no || '',
-        // league_name: game.league_name || '',
-        // league_id: game.league_id || '',
-        // compe: game.compe || '',
-        // home_team_name: game.home_team_name || '',
-        // away_team_name: game.away_team_name || '',
-        // match_date: game.match_date || '',
-        // match_time: game.match_time || '',
+        //...game, // ⭐ GameDto의 모든 필드 유지
+        
+        
+        
+        
+        game_id: game.game_id || '',
+        game_no: game.game_no || '',
+        league_name: game.league_name || '',
+        league_id: game.league_id || '',
+        compe: game.compe || '',
+        home_team_name: game.home_team_name || '',
+        away_team_name: game.away_team_name || '',
+        match_date: game.match_date || '',
+        match_time: game.match_time || '',
+
+
+
+
         recommended_betting_type: 'home',
         confidence_score: 50,
         reason: '인기 경기',
